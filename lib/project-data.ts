@@ -35,7 +35,6 @@ export async function getProjectPageData(workspaceSlug: string, projectKey: stri
       orderBy: { createdAt: "asc" },
     }),
     prisma.label.findMany({
-      where: { projectId: context.project.id },
       orderBy: { name: "asc" },
     }),
     prisma.issue.findMany({

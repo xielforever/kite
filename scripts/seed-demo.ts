@@ -285,6 +285,19 @@ async function main() {
       })),
     });
 
+    const labels: Record<string, string> = {};
+    for (const labelSeed of labelSeeds) {
+      const label = await tx.label.upsert({
+        where: { name: labelSeed.name },
+        update: { color: labelSeed.color },
+        create: {
+          name: labelSeed.name,
+          color: labelSeed.color,
+        },
+      });
+      labels[label.name] = label.id;
+    }
+
     let issueCount = 0;
     let commentCount = 0;
 
@@ -307,18 +320,6 @@ async function main() {
           role: role as ProjectRoleValue,
         })),
       });
-
-      const labels: Record<string, string> = {};
-      for (const labelSeed of labelSeeds) {
-        const label = await tx.label.create({
-          data: {
-            projectId: project.id,
-            name: labelSeed.name,
-            color: labelSeed.color,
-          },
-        });
-        labels[label.name] = label.id;
-      }
 
       for (const [index, issueSeed] of projectSeed.issues.entries()) {
         const issueNumber = index + 1;

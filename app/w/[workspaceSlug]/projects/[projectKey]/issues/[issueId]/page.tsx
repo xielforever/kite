@@ -21,7 +21,7 @@ export default async function IssueDetailPage({
   const { workspace, project, user, canEditProject } = await requireProject(workspaceSlug, projectKey);
   const [members, labels, issue] = await Promise.all([
     prisma.projectMember.findMany({ where: { projectId: project.id }, include: { user: true } }),
-    prisma.label.findMany({ where: { projectId: project.id }, orderBy: { name: "asc" } }),
+    prisma.label.findMany({ orderBy: { name: "asc" } }),
     prisma.issue.findFirst({
       where: { id: issueId, projectId: project.id },
       include: {

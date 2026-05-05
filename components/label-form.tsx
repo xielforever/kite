@@ -7,12 +7,11 @@ import { ActionForm } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function LabelForm({ workspaceSlug, projectKey }: { workspaceSlug: string; projectKey: string }) {
+export function LabelForm() {
   const [color, setColor] = useState(labelPalette[0]);
-  const action = createLabelAction.bind(null, workspaceSlug, projectKey);
 
   return (
-    <ActionForm action={action} submitLabel="添加标签">
+    <ActionForm action={createLabelAction} submitLabel="添加标签">
       <div className="space-y-2">
         <Label htmlFor="label-name">名称</Label>
         <Input id="label-name" name="name" required />

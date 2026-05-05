@@ -79,9 +79,9 @@ async function validateIssueRelations(projectId: string, workspaceId: string, as
 
   if (labelIds.length) {
     const count = await prisma.label.count({
-      where: { projectId, id: { in: labelIds } },
+      where: { id: { in: labelIds } },
     });
-    if (count !== new Set(labelIds).size) throw new ForbiddenError("标签不属于该项目");
+    if (count !== new Set(labelIds).size) throw new ForbiddenError("标签不存在");
   }
 }
 
@@ -621,9 +621,8 @@ export async function updateCommentAction(workspaceSlug: string, projectKeyValue
   return { ok: true };
 }
 
-export async function createLabelAction(workspaceSlug: string, projectKeyValue: string, _state: ActionState, formData: FormData): Promise<ActionState> {
+export async function createLabelAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireSystemAdmin();
-  const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
   const parsed = labelSchema.safeParse({
     name: formValue(formData, "name"),
     color: formValue(formData, "color"),
@@ -631,29 +630,6 @@ export async function createLabelAction(workspaceSlug: string, projectKeyValue: 
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
   try {
     await prisma.label.create({
-      data: { projectId: project.id, name: parsed.data.name, color: parsed.data.color },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "标签已存在" };
-    }
-    return actionError(error);
-  }
-  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
-  return { ok: true };
-}
-
-export async function updateLabelAction(workspaceSlug: string, projectKeyValue: string, labelId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireSystemAdmin();
-  const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
-  const parsed = labelSchema.safeParse({
-    name: formValue(formData, "name"),
-    color: formValue(formData, "color"),
-  });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  try {
-    await prisma.label.update({
-      where: { id: labelId, projectId: project.id },
       data: { name: parsed.data.name, color: parsed.data.color },
     });
   } catch (error) {
@@ -662,15 +638,45 @@ export async function updateLabelAction(workspaceSlug: string, projectKeyValue: 
     }
     return actionError(error);
   }
-  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+  revalidatePath("/admin/labels");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
   return { ok: true };
 }
 
-export async function deleteLabelAction(workspaceSlug: string, projectKeyValue: string, labelId: string) {
+export async function updateLabelAction(labelId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
   await requireSystemAdmin();
-  const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
-  await prisma.label.deleteMany({ where: { id: labelId, projectId: project.id } });
-  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+  const parsed = labelSchema.safeParse({
+    name: formValue(formData, "name"),
+    color: formValue(formData, "color"),
+  });
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
+  try {
+    await prisma.label.update({
+      where: { id: labelId },
+      data: { name: parsed.data.name, color: parsed.data.color },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { error: "标签已存在" };
+    }
+    return actionError(error);
+  }
+  revalidatePath("/admin/labels");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
+  return { ok: true };
+}
+
+export async function deleteLabelAction(labelId: string) {
+  await requireSystemAdmin();
+  await prisma.label.deleteMany({ where: { id: labelId } });
+  revalidatePath("/admin/labels");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
+  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
 }
 
 export async function addProjectMemberAction(workspaceSlug: string, projectKeyValue: string, _state: ActionState, formData: FormData): Promise<ActionState> {

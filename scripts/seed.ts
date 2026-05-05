@@ -42,9 +42,9 @@ async function main() {
   });
 
   const label = await prisma.label.upsert({
-    where: { projectId_name: { projectId: project.id, name: "前端" } },
+    where: { name: "前端" },
     update: { color: "#2563eb" },
-    create: { projectId: project.id, name: "前端", color: "#2563eb" },
+    create: { name: "前端", color: "#2563eb" },
   });
 
   for (const issue of [

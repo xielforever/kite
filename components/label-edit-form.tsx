@@ -6,15 +6,11 @@ import { ActionForm } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 
 export function LabelEditForm({
-  workspaceSlug,
-  projectKey,
   label,
 }: {
-  workspaceSlug: string;
-  projectKey: string;
   label: { id: string; name: string; color: string };
 }) {
-  const action = updateLabelAction.bind(null, workspaceSlug, projectKey, label.id);
+  const action = updateLabelAction.bind(null, label.id);
 
   return (
     <ActionForm action={action} submitLabel="保存" className="space-y-3">
