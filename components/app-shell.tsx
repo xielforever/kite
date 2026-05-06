@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { LogOut, SlidersHorizontal } from "lucide-react";
 import { logoutAction } from "@/lib/actions";
 import { auth } from "@/lib/auth";
 import { enforcePasswordReset } from "@/lib/password-guard";

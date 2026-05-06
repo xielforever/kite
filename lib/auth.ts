@@ -9,6 +9,7 @@ export const authConfig = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
+    maxAge: 4 * 60 * 60,
   },
   pages: {
     signIn: "/login",
@@ -49,6 +50,18 @@ export const authConfig = {
       }
       if (user && "systemRole" in user) {
         token.systemRole = user.systemRole;
+      }
+      if (!user && token.sub) {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { systemRole: true, mustChangePassword: true },
+        });
+        if (fresh) {
+          token.systemRole = fresh.systemRole;
+          token.mustChangePassword = fresh.mustChangePassword;
+        } else {
+          token.systemRole = "USER";
+        }
       }
       return token;
     },

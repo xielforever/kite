@@ -2,7 +2,7 @@ import { addMemberAction, createInvitationAction, removeMemberAction, revokeInvi
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
 import { canManageWorkspace } from "@/lib/role-rules";
-import { roleLabels, workspaceRoles, type WorkspaceRoleValue } from "@/lib/constants";
+import { roleLabels, userPublicFields, workspaceRoles, type WorkspaceRoleValue } from "@/lib/constants";
 import { AppShell } from "@/components/app-shell";
 import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
   const [members, invitations] = await Promise.all([
     prisma.workspaceMember.findMany({
       where: { workspaceId: workspace.id },
-      include: { user: true },
+      include: { user: { select: userPublicFields } },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     }),
     prisma.workspaceInvitation.findMany({
@@ -27,6 +27,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
     }),
   ]);
   const canManage = canManageWorkspace(membership.role);
+  const isOwner = membership.role === "OWNER";
   const addMember = addMemberAction.bind(null, workspaceSlug);
   const createInvite = createInvitationAction.bind(null, workspaceSlug);
 
@@ -44,7 +45,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
                     <p className="text-sm text-muted-foreground">{member.user.email}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {canManage ? (
+                    {canManage && (isOwner || (member.role !== "OWNER" && member.role !== "ADMIN")) ? (
                       <form action={async (formData) => {
                         "use server";
                         await updateMemberRoleAction(workspaceSlug, member.id, formData.get("role") as WorkspaceRoleValue);
@@ -59,7 +60,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
                     ) : (
                       <span className="text-sm text-muted-foreground">{roleLabels[member.role]}</span>
                     )}
-                    {canManage ? (
+                    {canManage && (isOwner || (member.role !== "OWNER" && member.role !== "ADMIN")) ? (
                       <form action={async () => {
                         "use server";
                         await removeMemberAction(workspaceSlug, member.id);
@@ -115,7 +116,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
                   <div className="space-y-2">
                     <Label htmlFor="invite-role">角色</Label>
                     <select id="invite-role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
-                      {workspaceRoles.map((role) => (
+                      {(isOwner ? workspaceRoles : workspaceRoles.filter((r) => r === "MEMBER")).map((role) => (
                         <option key={role} value={role}>{roleLabels[role]}</option>
                       ))}
                     </select>
@@ -134,7 +135,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
                   <div className="space-y-2">
                     <Label htmlFor="role">角色</Label>
                     <select id="role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
-                      {workspaceRoles.map((role) => (
+                      {(isOwner ? workspaceRoles : workspaceRoles.filter((r) => r === "MEMBER")).map((role) => (
                         <option key={role} value={role}>{roleLabels[role]}</option>
                       ))}
                     </select>

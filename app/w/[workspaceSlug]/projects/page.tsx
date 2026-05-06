@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { projectRoleLabels } from "@/lib/constants";
+import { projectRoleLabels, userPublicFields } from "@/lib/constants";
 
 function memberInitial(name?: string | null, email?: string | null) {
   return (name?.trim() || email?.trim() || "U").slice(0, 1).toUpperCase();
@@ -35,7 +35,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
     include: {
       issues: true,
       members: {
-        include: { user: true },
+        include: { user: { select: userPublicFields } },
         orderBy: { createdAt: "asc" },
       },
     },

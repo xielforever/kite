@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { signIn, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRoleValue } from "@/lib/constants";
+import { userPublicFields } from "@/lib/constants";
 import {
   ForbiddenError,
   requireProject,
@@ -120,12 +121,18 @@ export async function registerAction(_state: ActionState, formData: FormData): P
   return { ok: true };
 }
 
+function safeRedirectUrl(url: string): string {
+  if (url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\")) return url;
+  return "/workspaces";
+}
+
 export async function loginAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
+    const callbackUrl = formValue(formData, "callbackUrl");
     await signIn("credentials", {
       email: formValue(formData, "email").toLowerCase(),
       password: formValue(formData, "password"),
-      redirectTo: formValue(formData, "callbackUrl") || "/workspaces",
+      redirectTo: callbackUrl ? safeRedirectUrl(callbackUrl) : "/workspaces",
     });
   } catch (error) {
     if (isRedirectError(error)) throw error;
@@ -216,7 +223,7 @@ export async function addMemberAction(workspaceSlug: string, _state: ActionState
     return { error: "只有所有者可以添加管理员或所有者" };
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
   if (!user) return { error: "该用户尚未注册" };
 
   try {
@@ -290,18 +297,39 @@ export async function acceptInvitationAction(token: string) {
     throw new ForbiddenError("该邀请不属于当前登录账号");
   }
 
-  await prisma.$transaction([
-    prisma.workspaceMember.upsert({
+  const result = await prisma.$transaction(async (tx) => {
+    const locked = await tx.workspaceInvitation.findUnique({
+      where: { id: invitation.id },
+    });
+    if (!locked || locked.acceptedAt) throw new ForbiddenError("邀请已被使用");
+
+    const existing = await tx.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } },
-      update: { role: invitation.role },
-      create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role },
-    }),
-    prisma.workspaceInvitation.update({
+    });
+
+    if (existing) {
+      const roleOrder: Record<string, number> = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
+      if (roleOrder[invitation.role] > roleOrder[existing.role]) {
+        await tx.workspaceMember.update({
+          where: { id: existing.id },
+          data: { role: invitation.role },
+        });
+      }
+    } else {
+      await tx.workspaceMember.create({
+        data: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role },
+      });
+    }
+
+    await tx.workspaceInvitation.update({
       where: { id: invitation.id },
       data: { acceptedAt: new Date() },
-    }),
-  ]);
-  redirect(`/w/${invitation.workspace.slug}`);
+    });
+
+    return invitation.workspace.slug;
+  });
+
+  redirect(`/w/${result}`);
 }
 
 export async function updateMemberRoleAction(workspaceSlug: string, memberId: string, role: WorkspaceRoleValue) {
@@ -309,6 +337,9 @@ export async function updateMemberRoleAction(workspaceSlug: string, memberId: st
   if (!canChangeRole(membership.role, role)) throw new ForbiddenError("只有所有者可以设置该角色");
   const target = await prisma.workspaceMember.findUnique({ where: { id: memberId } });
   if (!target) return;
+  if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
+    throw new ForbiddenError("只有所有者可以修改管理员或所有者的角色");
+  }
   if (target.role === "OWNER" && role !== "OWNER") {
     const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
     if (ownerCount <= 1) throw new ForbiddenError("不能降级最后一个所有者");
@@ -321,8 +352,8 @@ export async function removeMemberAction(workspaceSlug: string, memberId: string
   const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
   const target = await prisma.workspaceMember.findUnique({ where: { id: memberId } });
   if (!target) return;
-  if (target.role === "OWNER" && membership.role !== "OWNER") {
-    throw new ForbiddenError("只有所有者可以移除所有者");
+  if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
+    throw new ForbiddenError("只有所有者可以移除管理员或所有者");
   }
   if (target.role === "OWNER") {
     const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
@@ -517,29 +548,31 @@ export async function deleteIssueAction(workspaceSlug: string, projectKeyValue: 
 }
 
 export async function moveIssue(input: unknown) {
-  const parsed = issueMoveSchema.parse(input);
+  const parsed = issueMoveSchema.safeParse(input);
+  if (!parsed.success) throw new Error("参数验证失败");
+  const { issueId, overIssueId, status } = parsed.data;
   const issue = await prisma.issue.findUnique({
-    where: { id: parsed.issueId },
+    where: { id: issueId },
     include: { project: { include: { workspace: true } } },
   });
   if (!issue) throw new Error("任务不存在");
   const { user } = await requireProjectEditor(issue.project.workspace.slug, issue.project.key);
 
   let sortOrder = Date.now();
-  if (parsed.overIssueId) {
+  if (overIssueId) {
     const overIssue = await prisma.issue.findFirst({
-      where: { id: parsed.overIssueId, projectId: issue.projectId },
+      where: { id: overIssueId, projectId: issue.projectId },
     });
     if (overIssue) sortOrder = overIssue.sortOrder - 1;
   }
 
   await prisma.$transaction([
     prisma.issue.update({
-      where: { id: parsed.issueId },
-      data: { status: parsed.status, sortOrder },
+      where: { id: issueId },
+      data: { status, sortOrder },
     }),
     prisma.issueActivity.create({
-      data: { issueId: parsed.issueId, actorId: user.id, action: "移动任务", detail: parsed.status },
+      data: { issueId, actorId: user.id, action: "移动任务", detail: status },
     }),
   ]);
   revalidatePath(`/w/${issue.project.workspace.slug}/projects/${issue.project.key}`);
@@ -604,7 +637,7 @@ export async function addProjectMemberAction(workspaceSlug: string, projectKeyVa
 
   const member = await prisma.workspaceMember.findFirst({
     where: { workspaceId: workspace.id, user: { email: parsed.data.email } },
-    include: { user: true },
+    include: { user: { select: userPublicFields } },
   });
   if (!member) return { error: "该用户尚未加入工作区" };
 
@@ -677,7 +710,7 @@ export async function updatePasswordAction(_state: ActionState, formData: FormDa
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
   if (!dbUser) return { error: "用户不存在" };
   const valid = await compare(parsed.data.currentPassword, dbUser.passwordHash);
   if (!valid) return { error: "当前密码不正确" };
@@ -686,6 +719,8 @@ export async function updatePasswordAction(_state: ActionState, formData: FormDa
     where: { id: user.id },
     data: { passwordHash: await hash(parsed.data.newPassword, 12), mustChangePassword: false },
   });
+  revalidatePath("/setup/change-password");
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -696,14 +731,19 @@ export async function forceChangePasswordAction(_state: ActionState, formData: F
 }
 
 export async function adminUpdateUserRoleAction(_state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireSystemAdmin();
+  const admin = await requireSystemAdmin();
   const parsed = adminUserRoleSchema.safeParse({
     userId: formValue(formData, "userId"),
     systemRole: formValue(formData, "systemRole"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  if (parsed.data.userId === admin.id) return { error: "不能修改自己的系统角色" };
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { id: true, systemRole: true } });
   if (!target) return { error: "用户不存在" };
+  const superAdminCount = await prisma.user.count({ where: { systemRole: "SUPER_ADMIN" } });
+  if (target.systemRole === "SUPER_ADMIN" && parsed.data.systemRole !== "SUPER_ADMIN" && superAdminCount <= 1) {
+    return { error: "系统至少需要一位超级管理员" };
+  }
   await prisma.user.update({
     where: { id: parsed.data.userId },
     data: { systemRole: parsed.data.systemRole },
@@ -719,7 +759,7 @@ export async function adminResetPasswordAction(_state: ActionState, formData: Fo
     newPassword: formValue(formData, "newPassword"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { id: true } });
   if (!target) return { error: "用户不存在" };
   await prisma.user.update({
     where: { id: parsed.data.userId },

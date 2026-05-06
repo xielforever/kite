@@ -1,6 +1,7 @@
 import { updatePasswordAction, updateProfileAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
+import { userPublicFields } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: sessionUser.id } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: sessionUser.id }, select: userPublicFields });
 
   return (
     <AppShell title="个人资料" subtitle="更新账号信息和密码">

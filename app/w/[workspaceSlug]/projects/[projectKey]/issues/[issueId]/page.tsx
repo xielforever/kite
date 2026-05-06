@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { deleteCommentAction, deleteIssueAction } from "@/lib/actions";
-import { priorityLabels, statusLabels } from "@/lib/constants";
+import { priorityLabels, statusLabels, userPublicFields } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
@@ -20,14 +20,14 @@ export default async function IssueDetailPage({
   const { workspaceSlug, projectKey, issueId } = await params;
   const { workspace, project, user, canEditProject } = await requireProject(workspaceSlug, projectKey);
   const [members, issue] = await Promise.all([
-    prisma.projectMember.findMany({ where: { projectId: project.id }, include: { user: true } }),
+    prisma.projectMember.findMany({ where: { projectId: project.id }, include: { user: { select: userPublicFields } } }),
     prisma.issue.findFirst({
       where: { id: issueId, projectId: project.id },
       include: {
-        assignee: true,
-        creator: true,
-        comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
-        activities: { include: { actor: true }, orderBy: { createdAt: "desc" } },
+        assignee: { select: userPublicFields },
+        creator: { select: userPublicFields },
+        comments: { include: { author: { select: userPublicFields } }, orderBy: { createdAt: "asc" } },
+        activities: { include: { actor: { select: userPublicFields } }, orderBy: { createdAt: "desc" } },
       },
     }),
   ]);
@@ -68,7 +68,7 @@ export default async function IssueDetailPage({
               {issue.activities.map((activity) => (
                 <div key={activity.id} className="rounded-md border p-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium">{activity.actor.name} · {activity.action}</p>
+                    <p className="font-medium">{activity.actor?.name ?? "已删除用户"} · {activity.action}</p>
                     <p className="text-xs text-muted-foreground">{formatDate(activity.createdAt)}</p>
                   </div>
                   {activity.detail ? <p className="mt-1 text-muted-foreground">{activity.detail}</p> : null}
@@ -86,7 +86,7 @@ export default async function IssueDetailPage({
                 <div key={comment.id} className="rounded-md border p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium">{comment.author.name}</p>
+                      <p className="text-sm font-medium">{comment.author?.name ?? "已删除用户"}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</p>
                     </div>
                     {comment.authorId === user.id ? (

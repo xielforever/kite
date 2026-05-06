@@ -4,7 +4,6 @@ import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Users, Building2, FolderKanban } from "lucide-react";
 import { systemRoleLabels, systemRoles } from "@/lib/constants";

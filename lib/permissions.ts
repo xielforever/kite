@@ -24,7 +24,7 @@ export async function requireUser() {
   if (!session?.user?.id) redirect("/login");
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, image: true, systemRole: true, mustChangePassword: true },
+    select: { id: true, name: true, email: true, systemRole: true, mustChangePassword: true },
   });
   if (!user) redirect("/api/auth/session-expired");
   return user;

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/permissions";
-import type { IssuePriorityValue, IssueStatusValue } from "@/lib/constants";
+import { userPublicFields, type IssuePriorityValue, type IssueStatusValue } from "@/lib/constants";
 
 export const PAGE_SIZE = 20;
 
@@ -33,13 +33,13 @@ export async function getProjectPageData(workspaceSlug: string, projectKey: stri
   const [members, issues, totalIssues] = await Promise.all([
     prisma.projectMember.findMany({
       where: { projectId: context.project.id },
-      include: { user: true },
+      include: { user: { select: userPublicFields } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.issue.findMany({
       where: issueWhere,
       include: {
-        assignee: true,
+        assignee: { select: userPublicFields },
       },
       orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
       skip: (page - 1) * PAGE_SIZE,

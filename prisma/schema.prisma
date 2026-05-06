@@ -159,10 +159,10 @@ model Issue {
 model IssueComment {
   id        String   @id @default(cuid())
   issueId   String
-  authorId  String
+  authorId  String?
   body      String
   issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -172,11 +172,11 @@ model IssueComment {
 model IssueActivity {
   id        String   @id @default(cuid())
   issueId   String
-  actorId   String
+  actorId   String?
   action    String
   detail    String?
   issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  actor     User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([issueId, createdAt])

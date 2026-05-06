@@ -44,3 +44,5 @@ export const projectRoleLabels: Record<ProjectRoleValue, string> = {
   MEMBER: "成员",
   VIEWER: "只读",
 };
+
+export const userPublicFields = { id: true, name: true, email: true, systemRole: true, mustChangePassword: true, createdAt: true } as const;
