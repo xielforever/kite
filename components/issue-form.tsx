@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 type MemberOption = { id: string; name: string; email: string };
-type LabelOption = { id: string; name: string; color: string };
 type IssueDefaults = {
   id: string;
   title: string;
@@ -17,20 +16,17 @@ type IssueDefaults = {
   priority: IssuePriorityValue;
   assigneeId?: string | null;
   dueDate?: Date | string | null;
-  labelIds: string[];
 };
 
 export function IssueForm({
   workspaceSlug,
   projectKey,
   members,
-  labels,
   defaults,
 }: {
   workspaceSlug: string;
   projectKey: string;
   members: MemberOption[];
-  labels: LabelOption[];
   defaults?: IssueDefaults;
 }) {
   const action = defaults
@@ -85,25 +81,6 @@ export function IssueForm({
           />
         </div>
       </div>
-      {labels.length ? (
-        <div className="space-y-2">
-          <Label>标签</Label>
-          <div className="flex flex-wrap gap-2">
-            {labels.map((label) => (
-              <label key={label.id} className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-sm">
-                <input
-                  type="checkbox"
-                  name="labelIds"
-                  value={label.id}
-                  defaultChecked={defaults?.labelIds.includes(label.id)}
-                />
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: label.color }} />
-                {label.name}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </ActionForm>
   );
 }

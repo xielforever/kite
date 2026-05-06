@@ -196,7 +196,7 @@ export default async function WorkspacesPage() {
               </div>
               <h2 className="mt-4 text-lg font-semibold">还没有工作区</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                {canCreate ? "创建第一个工作区后，就可以继续添加项目、任务和成员。" : "当前账号还没有加入任何工作区，请联系系统管理员添加成员权限。"}
+                {canCreate ? "创建第一个工作区后，就可以继续添加项目、任务和成员。" : "当前账号还没有加入任何工作区。请联系系统管理员将你添加到工作区，或通过邀请链接加入。"}
               </p>
             </div>
           )}

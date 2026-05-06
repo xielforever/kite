@@ -44,9 +44,16 @@ export function IssueBoard({
   canMove: boolean;
 }) {
   const [localIssues, setLocalIssues] = useState(issues);
+  const [toast, setToast] = useState<{ type: "ok" | "err"; message: string } | null>(null);
   useEffect(() => {
     setLocalIssues(issues);
   }, [issues]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const grouped = useMemo(() => statusColumns.reduce<Record<IssueStatusValue, BoardIssue[]>>((acc, status) => {
@@ -76,12 +83,22 @@ export function IssueBoard({
     });
     if (!response.ok) {
       setLocalIssues(issues);
+      setToast({ type: "err", message: "移动失败，已回滚" });
+    } else {
+      setToast({ type: "ok", message: `已移至${statusLabels[status]}` });
     }
   }
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="relative">
+        {toast ? (
+          <div className={`fixed bottom-4 right-4 z-50 rounded-md px-4 py-2 text-sm font-medium shadow-lg transition-opacity ${toast.type === "ok" ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
+            {toast.message}
+          </div>
+        ) : null}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3 md:grid-cols-1">
         {statusColumns.map((status) => (
           <BoardColumn
             key={status}

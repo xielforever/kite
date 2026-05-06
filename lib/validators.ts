@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { issuePriorities, issueStatuses, projectRoles, workspaceRoles } from "@/lib/constants";
+import { issuePriorities, issueStatuses, projectRoles, systemRoles, workspaceRoles } from "@/lib/constants";
 
 export const registerSchema = z.object({
   name: z.string().trim().min(1, "请输入姓名").max(80, "姓名过长"),
@@ -30,6 +30,7 @@ export const workspaceSchema = z.object({
     .min(2, "slug 至少 2 位")
     .max(48)
     .regex(/^[a-z0-9-]+$/, "slug 只能包含小写字母、数字和连字符"),
+  description: z.string().trim().max(600).optional().or(z.literal("")),
 });
 
 export const workspaceUpdateSchema = workspaceSchema;
@@ -67,7 +68,6 @@ export const issueSchema = z.object({
   priority: z.enum(issuePriorities),
   assigneeId: z.string().optional().or(z.literal("")),
   dueDate: z.string().optional().or(z.literal("")),
-  labelIds: z.array(z.string()).optional(),
 });
 
 export const issueMoveSchema = z.object({
@@ -80,7 +80,12 @@ export const commentSchema = z.object({
   body: z.string().trim().min(1, "请输入评论").max(3000),
 });
 
-export const labelSchema = z.object({
-  name: z.string().trim().min(1, "请输入标签名称").max(40),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "颜色格式不正确"),
+export const adminUserRoleSchema = z.object({
+  userId: z.string().min(1),
+  systemRole: z.enum(systemRoles),
+});
+
+export const adminResetPasswordSchema = z.object({
+  userId: z.string().min(1),
+  newPassword: z.string().min(8, "新密码至少 8 位").max(128),
 });

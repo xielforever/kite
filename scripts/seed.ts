@@ -41,18 +41,12 @@ async function main() {
     create: { projectId: project.id, userId: user.id, role: "LEAD" },
   });
 
-  const label = await prisma.label.upsert({
-    where: { name: "前端" },
-    update: { color: "#2563eb" },
-    create: { name: "前端", color: "#2563eb" },
-  });
-
   for (const issue of [
     { number: 1, title: "完善任务列表", status: "TODO" as const },
     { number: 2, title: "优化看板拖拽", status: "IN_PROGRESS" as const },
     { number: 3, title: "发布内部试用", status: "DONE" as const },
   ]) {
-    const created = await prisma.issue.upsert({
+    await prisma.issue.upsert({
       where: { projectId_number: { projectId: project.id, number: issue.number } },
       update: { title: issue.title, status: issue.status },
       create: {
@@ -65,12 +59,6 @@ async function main() {
         assigneeId: user.id,
         sortOrder: issue.number * 1000,
       },
-    });
-
-    await prisma.issueLabel.upsert({
-      where: { issueId_labelId: { issueId: created.id, labelId: label.id } },
-      update: {},
-      create: { issueId: created.id, labelId: label.id },
     });
   }
 

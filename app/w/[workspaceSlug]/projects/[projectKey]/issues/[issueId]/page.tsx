@@ -19,15 +19,13 @@ export default async function IssueDetailPage({
 }) {
   const { workspaceSlug, projectKey, issueId } = await params;
   const { workspace, project, user, canEditProject } = await requireProject(workspaceSlug, projectKey);
-  const [members, labels, issue] = await Promise.all([
+  const [members, issue] = await Promise.all([
     prisma.projectMember.findMany({ where: { projectId: project.id }, include: { user: true } }),
-    prisma.label.findMany({ orderBy: { name: "asc" } }),
     prisma.issue.findFirst({
       where: { id: issueId, projectId: project.id },
       include: {
         assignee: true,
         creator: true,
-        labels: { include: { label: true } },
         comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
         activities: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },
@@ -59,14 +57,6 @@ export default async function IssueDetailPage({
               <div>
                 <p className="mb-1 text-muted-foreground">描述</p>
                 <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3">{issue.description || "暂无描述"}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {issue.labels.map(({ label }) => (
-                  <span key={label.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: label.color }} />
-                    {label.name}
-                  </span>
-                ))}
               </div>
             </CardContent>
           </Card>
@@ -141,7 +131,6 @@ export default async function IssueDetailPage({
                     workspaceSlug={workspaceSlug}
                     projectKey={projectKey}
                     members={memberOptions}
-                    labels={labels}
                     defaults={{
                       id: issue.id,
                       title: issue.title,
@@ -150,7 +139,6 @@ export default async function IssueDetailPage({
                       priority: issue.priority,
                       assigneeId: issue.assigneeId,
                       dueDate: issue.dueDate,
-                      labelIds: issue.labels.map(({ label }) => label.id),
                     }}
                   />
                 </CardContent>
@@ -161,7 +149,7 @@ export default async function IssueDetailPage({
                   await deleteIssueAction(workspaceSlug, projectKey, issue.id);
                 }}
               >
-                <ConfirmSubmitButton variant="destructive" message="确定删除这个任务？评论、标签关联和活动记录都会删除。">
+                <ConfirmSubmitButton variant="destructive" message="确定删除这个任务？评论和活动记录都会删除。">
                   <Trash2 className="h-4 w-4" />
                   删除任务
                 </ConfirmSubmitButton>

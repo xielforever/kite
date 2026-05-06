@@ -40,12 +40,10 @@ enum IssuePriority {
 model User {
   id            String            @id @default(cuid())
   email         String            @unique
-  emailVerified DateTime?
   name          String
   passwordHash  String
   systemRole    SystemRole        @default(USER)
   mustChangePassword Boolean @default(false)
-  image         String?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   memberships   WorkspaceMember[]
@@ -63,6 +61,7 @@ model Workspace {
   id          String            @id @default(cuid())
   name        String
   slug        String            @unique
+  description String?
   createdById String
   createdBy   User              @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members     WorkspaceMember[]
@@ -148,7 +147,6 @@ model Issue {
   assignee    User?         @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   creator     User          @relation("IssueCreator", fields: [creatorId], references: [id], onDelete: Restrict)
   comments    IssueComment[]
-  labels      IssueLabel[]
   activities  IssueActivity[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -182,26 +180,6 @@ model IssueActivity {
   createdAt DateTime @default(now())
 
   @@index([issueId, createdAt])
-}
-
-model Label {
-  id        String       @id @default(cuid())
-  name      String
-  color     String       @default("#64748b")
-  issues    IssueLabel[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  @@unique([name])
-}
-
-model IssueLabel {
-  issueId String
-  labelId String
-  issue   Issue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
-
-  @@id([issueId, labelId])
 }
 
 model Account {

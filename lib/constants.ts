@@ -44,13 +44,3 @@ export const projectRoleLabels: Record<ProjectRoleValue, string> = {
   MEMBER: "成员",
   VIEWER: "只读",
 };
-
-export const labelPalette = [
-  "#2563eb",
-  "#16a34a",
-  "#dc2626",
-  "#ca8a04",
-  "#7c3aed",
-  "#0891b2",
-  "#475569",
-];

@@ -1,53 +1,168 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import {
+  registerSchema,
+  loginSchema,
+  profileSchema,
+  passwordSchema,
+  workspaceSchema,
+  memberSchema,
+  invitationSchema,
+  projectSchema,
+  projectMemberSchema,
+  issueSchema,
+  issueMoveSchema,
+  commentSchema,
+} from "@/lib/validators";
 
-const workspaceSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  slug: z.string().trim().min(2).max(48).regex(/^[a-z0-9-]+$/),
+describe("registerSchema", () => {
+  it("accepts valid registration", () => {
+    expect(registerSchema.safeParse({ name: "张三", email: "test@example.com", password: "12345678" }).success).toBe(true);
+  });
+  it("rejects short password", () => {
+    expect(registerSchema.safeParse({ name: "张三", email: "test@example.com", password: "123" }).success).toBe(false);
+  });
+  it("rejects invalid email", () => {
+    expect(registerSchema.safeParse({ name: "张三", email: "not-email", password: "12345678" }).success).toBe(false);
+  });
+  it("rejects empty name", () => {
+    expect(registerSchema.safeParse({ name: "", email: "test@example.com", password: "12345678" }).success).toBe(false);
+  });
 });
 
-const issueSchema = z.object({
-  title: z.string().trim().min(1).max(180),
-  description: z.string().trim().max(4000).optional().or(z.literal("")),
-  status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  assigneeId: z.string().optional().or(z.literal("")),
-  dueDate: z.string().optional().or(z.literal("")),
-  labelIds: z.array(z.string()).optional(),
+describe("loginSchema", () => {
+  it("accepts valid login", () => {
+    expect(loginSchema.safeParse({ email: "test@example.com", password: "any" }).success).toBe(true);
+  });
+  it("rejects empty password", () => {
+    expect(loginSchema.safeParse({ email: "test@example.com", password: "" }).success).toBe(false);
+  });
 });
 
-const issueMoveSchema = z.object({
-  issueId: z.string().min(1),
-  status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
-  overIssueId: z.string().optional(),
+describe("profileSchema", () => {
+  it("accepts valid profile", () => {
+    expect(profileSchema.safeParse({ name: "张三", email: "test@example.com" }).success).toBe(true);
+  });
+  it("rejects empty name", () => {
+    expect(profileSchema.safeParse({ name: " ", email: "test@example.com" }).success).toBe(false);
+  });
 });
 
-const labelSchema = z.object({
-  name: z.string().trim().min(1).max(40),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+describe("passwordSchema", () => {
+  it("accepts valid password change", () => {
+    expect(passwordSchema.safeParse({ currentPassword: "old12345", newPassword: "new12345" }).success).toBe(true);
+  });
+  it("rejects short new password", () => {
+    expect(passwordSchema.safeParse({ currentPassword: "old12345", newPassword: "abc" }).success).toBe(false);
+  });
 });
 
-describe("validators", () => {
+describe("workspaceSchema", () => {
+  it("accepts valid workspace", () => {
+    expect(workspaceSchema.safeParse({ name: "My Team", slug: "my-team" }).success).toBe(true);
+  });
+  it("rejects uppercase slug", () => {
+    expect(workspaceSchema.safeParse({ name: "Team", slug: "Team" }).success).toBe(false);
+  });
+  it("rejects slug with spaces", () => {
+    expect(workspaceSchema.safeParse({ name: "Team", slug: "team a" }).success).toBe(false);
+  });
+  it("rejects short slug", () => {
+    expect(workspaceSchema.safeParse({ name: "Team", slug: "a" }).success).toBe(false);
+  });
+});
+
+describe("memberSchema", () => {
+  it("accepts valid member", () => {
+    expect(memberSchema.safeParse({ email: "user@example.com", role: "MEMBER" }).success).toBe(true);
+  });
+  it("rejects invalid role", () => {
+    expect(memberSchema.safeParse({ email: "user@example.com", role: "KING" }).success).toBe(false);
+  });
+});
+
+describe("invitationSchema", () => {
+  it("accepts invitation without email", () => {
+    expect(invitationSchema.safeParse({ email: "", role: "MEMBER" }).success).toBe(true);
+  });
+  it("accepts invitation with email", () => {
+    expect(invitationSchema.safeParse({ email: "user@example.com", role: "ADMIN" }).success).toBe(true);
+  });
+});
+
+describe("projectSchema", () => {
+  it("accepts valid project", () => {
+    expect(projectSchema.safeParse({ name: "平台改造", key: "PLAT", description: "" }).success).toBe(true);
+  });
+  it("rejects lowercase key", () => {
+    expect(projectSchema.safeParse({ name: "项目", key: "plat", description: "" }).success).toBe(false);
+  });
+  it("rejects short key", () => {
+    expect(projectSchema.safeParse({ name: "项目", key: "P", description: "" }).success).toBe(false);
+  });
+});
+
+describe("projectMemberSchema", () => {
+  it("accepts valid project member", () => {
+    expect(projectMemberSchema.safeParse({ email: "user@example.com", role: "LEAD" }).success).toBe(true);
+  });
+  it("rejects invalid role", () => {
+    expect(projectMemberSchema.safeParse({ email: "user@example.com", role: "OWNER" }).success).toBe(false);
+  });
+});
+
+describe("issueSchema", () => {
   it("accepts core issue fields", () => {
-    const parsed = issueSchema.safeParse({
+    expect(issueSchema.safeParse({
       title: "修复登录",
       description: "",
       status: "TODO",
       priority: "HIGH",
       assigneeId: "",
       dueDate: "",
-      labelIds: [],
-    });
-    expect(parsed.success).toBe(true);
+    }).success).toBe(true);
   });
-
-  it("rejects invalid workspace slug", () => {
-    expect(workspaceSchema.safeParse({ name: "Team", slug: "Team A" }).success).toBe(false);
+  it("rejects empty title", () => {
+    expect(issueSchema.safeParse({
+      title: "",
+      description: "",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: "",
+      dueDate: "",
+    }).success).toBe(false);
   });
+  it("rejects invalid status", () => {
+    expect(issueSchema.safeParse({
+      title: "任务",
+      description: "",
+      status: "INVALID",
+      priority: "MEDIUM",
+      assigneeId: "",
+      dueDate: "",
+    }).success).toBe(false);
+  });
+});
 
-  it("validates label colors and issue moves", () => {
-    expect(labelSchema.safeParse({ name: "前端", color: "#2563eb" }).success).toBe(true);
-    expect(labelSchema.safeParse({ name: "前端", color: "blue" }).success).toBe(false);
-    expect(issueMoveSchema.safeParse({ issueId: "1", status: "DONE" }).success).toBe(true);
+describe("issueMoveSchema", () => {
+  it("accepts valid move", () => {
+    expect(issueMoveSchema.safeParse({ issueId: "abc123", status: "DONE" }).success).toBe(true);
+  });
+  it("accepts move with overIssueId", () => {
+    expect(issueMoveSchema.safeParse({ issueId: "abc123", status: "IN_PROGRESS", overIssueId: "def456" }).success).toBe(true);
+  });
+  it("rejects empty issueId", () => {
+    expect(issueMoveSchema.safeParse({ issueId: "", status: "DONE" }).success).toBe(false);
+  });
+});
+
+describe("commentSchema", () => {
+  it("accepts valid comment", () => {
+    expect(commentSchema.safeParse({ body: "好的，我来处理" }).success).toBe(true);
+  });
+  it("rejects empty comment", () => {
+    expect(commentSchema.safeParse({ body: "" }).success).toBe(false);
+  });
+  it("rejects whitespace-only comment", () => {
+    expect(commentSchema.safeParse({ body: "   " }).success).toBe(false);
   });
 });

@@ -60,7 +60,7 @@ export default async function ArchivedProjectsPage({ params }: { params: Promise
                       await deleteProjectAction(workspaceSlug, project.id);
                     }}
                   >
-                    <ConfirmSubmitButton size="sm" variant="destructive" message="确定永久删除这个归档项目？相关任务、评论和标签都会删除。">删除</ConfirmSubmitButton>
+                    <ConfirmSubmitButton size="sm" variant="destructive" message="确定永久删除这个归档项目？相关任务和评论都会删除。">删除</ConfirmSubmitButton>
                   </form>
                 </div>
               ) : null}

@@ -5,6 +5,7 @@ import { FormError } from "@/components/form-error";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { slugifyAscii } from "@/lib/utils";
 
 type ActionState = {
@@ -60,6 +61,10 @@ export function CreateWorkspaceForm({ action }: { action: CreateWorkspaceAction 
           required
         />
         <p className="text-xs text-muted-foreground">/w/{slug || "workspace"}</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="workspace-description">描述</Label>
+        <Textarea id="workspace-description" name="description" rows={2} placeholder="可选，简要描述工作区用途" />
       </div>
       <FormError message={state.error} />
       <SubmitButton pendingText="创建中...">创建工作区</SubmitButton>

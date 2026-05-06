@@ -3,6 +3,7 @@ import { IssueCard } from "@/components/issue-card";
 import { IssueFilters } from "@/components/issue-filters";
 import { IssueForm } from "@/components/issue-form";
 import { ProjectMemberPanel } from "@/components/project-member-panel";
+import { Pagination } from "@/components/pagination";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +14,11 @@ export default async function ProjectIssuesPage({
   searchParams,
 }: {
   params: Promise<{ workspaceSlug: string; projectKey: string }>;
-  searchParams: Promise<{ q?: string; status?: string; priority?: string; assignee?: string; label?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; priority?: string; assignee?: string; page?: string }>;
 }) {
   const { workspaceSlug, projectKey } = await params;
   const filters = await searchParams;
-  const { workspace, project, members, labels, issues, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, filters);
+  const { workspace, project, members, issues, totalIssues, page, pageSize, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, { ...filters, page: filters.page ? parseInt(filters.page, 10) : undefined });
   const memberOptions = members.map((member) => ({ id: member.user.id, name: member.user.name, email: member.user.email }));
 
   return (
@@ -30,7 +31,7 @@ export default async function ProjectIssuesPage({
           <Link href={`/w/${workspaceSlug}/projects/${projectKey}/issues`}>列表</Link>
         </Button>
       </div>
-      <IssueFilters members={memberOptions} labels={labels} />
+      <IssueFilters members={memberOptions} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="space-y-3">
           {issues.map((issue) => (
@@ -41,6 +42,7 @@ export default async function ProjectIssuesPage({
               <CardContent className="pt-5 text-sm text-muted-foreground">暂无任务</CardContent>
             </Card>
           ) : null}
+          <Pagination total={totalIssues} pageSize={pageSize} currentPage={page} />
         </div>
         <div className="space-y-4">
           {canEditProject ? (
@@ -49,7 +51,7 @@ export default async function ProjectIssuesPage({
                 <CardTitle>新建任务</CardTitle>
               </CardHeader>
               <CardContent>
-                <IssueForm workspaceSlug={workspaceSlug} projectKey={projectKey} members={memberOptions} labels={labels} />
+                <IssueForm workspaceSlug={workspaceSlug} projectKey={projectKey} members={memberOptions} />
               </CardContent>
             </Card>
           ) : null}

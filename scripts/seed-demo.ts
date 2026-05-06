@@ -36,7 +36,6 @@ type DemoIssue = {
   assigneeKey?: UserKey;
   dueInDays?: number;
   sortOrder: number;
-  labels: string[];
   comments?: { authorKey: UserKey; body: string }[];
 };
 
@@ -57,20 +56,11 @@ const workspaceMembers: { key: UserKey; role: WorkspaceRoleValue }[] = [
   { key: "viewer", role: "MEMBER" },
 ];
 
-const labelSeeds = [
-  { name: "前端", color: "#2563eb" },
-  { name: "后端", color: "#16a34a" },
-  { name: "缺陷", color: "#dc2626" },
-  { name: "文档", color: "#ca8a04" },
-  { name: "权限", color: "#7c3aed" },
-  { name: "运维", color: "#0891b2" },
-];
-
 const projectSeeds: DemoProject[] = [
   {
     key: "PLAT",
     name: "平台改造",
-    description: "用于验证项目级权限、看板拖拽、列表筛选、标签和评论。",
+    description: "用于验证项目级权限、看板拖拽、列表筛选和评论。",
     members: {
       owner: "LEAD",
       admin: "LEAD",
@@ -87,7 +77,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "lead",
         dueInDays: 3,
         sortOrder: 1000,
-        labels: ["权限", "后端"],
         comments: [
           { authorKey: "owner", body: "优先覆盖项目成员增删改和只读角色限制。" },
           { authorKey: "lead", body: "已补充主要路径，接下来验证异常提示。" },
@@ -101,7 +90,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "member",
         dueInDays: 5,
         sortOrder: 1000,
-        labels: ["前端", "缺陷"],
       },
       {
         title: "列表筛选支持负责人和状态",
@@ -111,7 +99,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "member",
         dueInDays: 8,
         sortOrder: 2000,
-        labels: ["前端"],
       },
       {
         title: "确认只读角色禁止编辑",
@@ -121,7 +108,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "viewer",
         dueInDays: -2,
         sortOrder: 1000,
-        labels: ["权限"],
       },
       {
         title: "补齐 README 部署检查项",
@@ -131,7 +117,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "lead",
         dueInDays: -1,
         sortOrder: 2000,
-        labels: ["文档"],
       },
     ],
   },
@@ -154,7 +139,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "member",
         dueInDays: 2,
         sortOrder: 1000,
-        labels: ["运维", "文档"],
         comments: [{ authorKey: "member", body: "已完成环境变量检查，待验证服务重启。" }],
       },
       {
@@ -165,7 +149,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "member",
         dueInDays: 1,
         sortOrder: 1000,
-        labels: ["运维"],
       },
       {
         title: "整理服务器访问清单",
@@ -175,7 +158,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "viewer",
         dueInDays: -4,
         sortOrder: 1000,
-        labels: ["文档", "运维"],
       },
     ],
   },
@@ -196,7 +178,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "admin",
         dueInDays: 10,
         sortOrder: 1000,
-        labels: ["文档"],
       },
       {
         title: "梳理发布公告文案",
@@ -206,7 +187,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "owner",
         dueInDays: 6,
         sortOrder: 1000,
-        labels: ["文档"],
       },
     ],
   },
@@ -229,7 +209,6 @@ const projectSeeds: DemoProject[] = [
         assigneeKey: "lead",
         dueInDays: -12,
         sortOrder: 1000,
-        labels: ["文档"],
       },
     ],
   },
@@ -285,19 +264,6 @@ async function main() {
       })),
     });
 
-    const labels: Record<string, string> = {};
-    for (const labelSeed of labelSeeds) {
-      const label = await tx.label.upsert({
-        where: { name: labelSeed.name },
-        update: { color: labelSeed.color },
-        create: {
-          name: labelSeed.name,
-          color: labelSeed.color,
-        },
-      });
-      labels[label.name] = label.id;
-    }
-
     let issueCount = 0;
     let commentCount = 0;
 
@@ -335,9 +301,6 @@ async function main() {
             assigneeId: issueSeed.assigneeKey ? users[issueSeed.assigneeKey].id : null,
             dueDate: dueDate(issueSeed.dueInDays),
             sortOrder: issueSeed.sortOrder,
-            labels: {
-              create: issueSeed.labels.map((labelName) => ({ labelId: labels[labelName] })),
-            },
           },
         });
 

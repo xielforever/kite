@@ -5,10 +5,8 @@ import { priorityLabels, statusLabels } from "@/lib/constants";
 
 export function IssueFilters({
   members,
-  labels,
 }: {
   members: { id: string; name: string }[];
-  labels: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,7 +19,7 @@ export function IssueFilters({
   }
 
   return (
-    <div className="mb-4 grid gap-2 rounded-lg border bg-card p-3 sm:grid-cols-5">
+    <div className="mb-4 grid gap-2 rounded-lg border bg-card p-3 sm:grid-cols-4">
       <input
         className="h-9 rounded-md border bg-background px-3 text-sm"
         defaultValue={searchParams.get("q") ?? ""}
@@ -48,12 +46,6 @@ export function IssueFilters({
         <option value="unassigned">未分配</option>
         {members.map((member) => (
           <option key={member.id} value={member.id}>{member.name}</option>
-        ))}
-      </select>
-      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("label") ?? ""} onChange={(event) => updateFilter("label", event.target.value)}>
-        <option value="">全部标签</option>
-        {labels.map((label) => (
-          <option key={label.id} value={label.id}>{label.name}</option>
         ))}
       </select>
     </div>

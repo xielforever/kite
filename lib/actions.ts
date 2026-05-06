@@ -21,11 +21,12 @@ import {
 import { canChangeRole, canCreateWorkspace } from "@/lib/role-rules";
 import { projectKey, slugifyAscii } from "@/lib/utils";
 import {
+  adminResetPasswordSchema,
+  adminUserRoleSchema,
   commentSchema,
   issueMoveSchema,
   issueSchema,
   invitationSchema,
-  labelSchema,
   memberSchema,
   passwordSchema,
   projectMemberSchema,
@@ -55,17 +56,13 @@ function formValue(formData: FormData, key: string) {
   return String(formData.get(key) ?? "");
 }
 
-function parseLabels(formData: FormData) {
-  return formData.getAll("labelIds").map(String).filter(Boolean);
-}
-
 function actionError(error: unknown): ActionState {
   if (error instanceof ForbiddenError) return { error: error.message };
   if (error instanceof Error) return { error: error.message };
   return { error: "操作失败，请稍后重试" };
 }
 
-async function validateIssueRelations(projectId: string, workspaceId: string, assigneeId?: string, labelIds: string[] = []) {
+async function validateIssueRelations(projectId: string, workspaceId: string, assigneeId?: string) {
   if (assigneeId) {
     const assignee = await prisma.projectMember.findFirst({
       where: {
@@ -75,13 +72,6 @@ async function validateIssueRelations(projectId: string, workspaceId: string, as
       },
     });
     if (!assignee) throw new ForbiddenError("负责人不属于该项目");
-  }
-
-  if (labelIds.length) {
-    const count = await prisma.label.count({
-      where: { id: { in: labelIds } },
-    });
-    if (count !== new Set(labelIds).size) throw new ForbiddenError("标签不存在");
   }
 }
 
@@ -160,6 +150,7 @@ export async function createWorkspaceAction(_state: ActionState, formData: FormD
   const parsed = workspaceSchema.safeParse({
     name,
     slug,
+    description: formValue(formData, "description"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
@@ -169,6 +160,7 @@ export async function createWorkspaceAction(_state: ActionState, formData: FormD
         data: {
           name: parsed.data.name,
           slug: parsed.data.slug,
+          description: parsed.data.description || null,
           createdById: user.id,
         },
       });
@@ -192,13 +184,14 @@ export async function updateWorkspaceAction(workspaceSlug: string, _state: Actio
   const parsed = workspaceUpdateSchema.safeParse({
     name: formValue(formData, "name"),
     slug: formValue(formData, "slug"),
+    description: formValue(formData, "description"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
     await prisma.workspace.update({
       where: { id: workspace.id },
-      data: { name: parsed.data.name, slug: parsed.data.slug },
+      data: { name: parsed.data.name, slug: parsed.data.slug, description: parsed.data.description || null },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -427,12 +420,11 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
     priority: formValue(formData, "priority") || "MEDIUM",
     assigneeId: formValue(formData, "assigneeId"),
     dueDate: formValue(formData, "dueDate"),
-    labelIds: parseLabels(formData),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
-    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId, parsed.data.labelIds);
+    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId);
   } catch (error) {
     return actionError(error);
   }
@@ -461,9 +453,6 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
         assigneeId: parsed.data.assigneeId || null,
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1000,
-        labels: parsed.data.labelIds?.length
-          ? { create: parsed.data.labelIds.map((labelId) => ({ labelId })) }
-          : undefined,
       },
     });
     await tx.issueActivity.create({
@@ -471,7 +460,6 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
     });
   });
 
-  revalidatePath("/admin/labels");
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/board`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues`);
@@ -487,12 +475,11 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
     priority: formValue(formData, "priority"),
     assigneeId: formValue(formData, "assigneeId"),
     dueDate: formValue(formData, "dueDate"),
-    labelIds: parseLabels(formData),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
-    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId, parsed.data.labelIds);
+    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId);
   } catch (error) {
     return actionError(error);
   }
@@ -500,7 +487,7 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
   const issue = await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } });
   if (!issue) return { error: "任务不存在" };
 
-  const operations: Prisma.PrismaPromise<unknown>[] = [
+  await prisma.$transaction([
     prisma.issue.update({
       where: { id: issueId },
       data: {
@@ -512,23 +499,10 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
       },
     }),
-    prisma.issueLabel.deleteMany({ where: { issueId } }),
-  ];
-  if (parsed.data.labelIds?.length) {
-    operations.push(
-      prisma.issueLabel.createMany({
-        data: parsed.data.labelIds.map((labelId) => ({ issueId, labelId })),
-        skipDuplicates: true,
-      }),
-    );
-  }
-  operations.push(
     prisma.issueActivity.create({
       data: { issueId, actorId: user.id, action: "更新任务", detail: parsed.data.title },
     }),
-  );
-  await prisma.$transaction(operations);
-  revalidatePath("/admin/labels");
+  ]);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/board`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues`);
@@ -597,7 +571,6 @@ export async function deleteCommentAction(workspaceSlug: string, projectKeyValue
   if (!comment) return;
   if (comment.authorId !== user.id) throw new ForbiddenError("只能删除自己的评论");
   await prisma.issueComment.delete({ where: { id: commentId } });
-  revalidatePath("/admin/labels");
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/board`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues`);
@@ -619,64 +592,6 @@ export async function updateCommentAction(workspaceSlug: string, projectKeyValue
   });
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
   return { ok: true };
-}
-
-export async function createLabelAction(_state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireSystemAdmin();
-  const parsed = labelSchema.safeParse({
-    name: formValue(formData, "name"),
-    color: formValue(formData, "color"),
-  });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  try {
-    await prisma.label.create({
-      data: { name: parsed.data.name, color: parsed.data.color },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "标签已存在" };
-    }
-    return actionError(error);
-  }
-  revalidatePath("/admin/labels");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
-  return { ok: true };
-}
-
-export async function updateLabelAction(labelId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireSystemAdmin();
-  const parsed = labelSchema.safeParse({
-    name: formValue(formData, "name"),
-    color: formValue(formData, "color"),
-  });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  try {
-    await prisma.label.update({
-      where: { id: labelId },
-      data: { name: parsed.data.name, color: parsed.data.color },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "标签已存在" };
-    }
-    return actionError(error);
-  }
-  revalidatePath("/admin/labels");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
-  return { ok: true };
-}
-
-export async function deleteLabelAction(labelId: string) {
-  await requireSystemAdmin();
-  await prisma.label.deleteMany({ where: { id: labelId } });
-  revalidatePath("/admin/labels");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/board", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues", "page");
-  revalidatePath("/w/[workspaceSlug]/projects/[projectKey]/issues/[issueId]", "page");
 }
 
 export async function addProjectMemberAction(workspaceSlug: string, projectKeyValue: string, _state: ActionState, formData: FormData): Promise<ActionState> {
@@ -778,4 +693,38 @@ export async function forceChangePasswordAction(_state: ActionState, formData: F
   const result = await updatePasswordAction(_state, formData);
   if (result.error) return result;
   redirect("/workspaces");
+}
+
+export async function adminUpdateUserRoleAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSystemAdmin();
+  const parsed = adminUserRoleSchema.safeParse({
+    userId: formValue(formData, "userId"),
+    systemRole: formValue(formData, "systemRole"),
+  });
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  if (!target) return { error: "用户不存在" };
+  await prisma.user.update({
+    where: { id: parsed.data.userId },
+    data: { systemRole: parsed.data.systemRole },
+  });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function adminResetPasswordAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSystemAdmin();
+  const parsed = adminResetPasswordSchema.safeParse({
+    userId: formValue(formData, "userId"),
+    newPassword: formValue(formData, "newPassword"),
+  });
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  if (!target) return { error: "用户不存在" };
+  await prisma.user.update({
+    where: { id: parsed.data.userId },
+    data: { passwordHash: await hash(parsed.data.newPassword, 12), mustChangePassword: true },
+  });
+  revalidatePath("/admin");
+  return { ok: true };
 }

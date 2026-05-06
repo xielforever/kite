@@ -10,8 +10,6 @@ async function main() {
     prisma.verificationToken.deleteMany(),
     prisma.issueActivity.deleteMany(),
     prisma.issueComment.deleteMany(),
-    prisma.issueLabel.deleteMany(),
-    prisma.label.deleteMany(),
     prisma.issue.deleteMany(),
     prisma.projectMember.deleteMany(),
     prisma.project.deleteMany(),

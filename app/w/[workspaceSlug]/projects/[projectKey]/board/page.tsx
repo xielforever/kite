@@ -13,11 +13,11 @@ export default async function ProjectBoardPage({
   searchParams,
 }: {
   params: Promise<{ workspaceSlug: string; projectKey: string }>;
-  searchParams: Promise<{ q?: string; status?: string; priority?: string; assignee?: string; label?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; priority?: string; assignee?: string }>;
 }) {
   const { workspaceSlug, projectKey } = await params;
   const filters = await searchParams;
-  const { workspace, project, members, labels, issues, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, filters);
+  const { workspace, project, members, issues, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, filters);
   const memberOptions = members.map((member) => ({ id: member.user.id, name: member.user.name, email: member.user.email }));
 
   return (
@@ -30,7 +30,7 @@ export default async function ProjectBoardPage({
           <Link href={`/w/${workspaceSlug}/projects/${projectKey}/issues`}>列表</Link>
         </Button>
       </div>
-      <IssueFilters members={memberOptions} labels={labels} />
+      <IssueFilters members={memberOptions} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <IssueBoard issues={issues} workspaceSlug={workspaceSlug} projectKey={projectKey} canMove={canEditProject} />
         <div className="space-y-4">
@@ -40,7 +40,7 @@ export default async function ProjectBoardPage({
                 <CardTitle>新建任务</CardTitle>
               </CardHeader>
               <CardContent>
-                <IssueForm workspaceSlug={workspaceSlug} projectKey={projectKey} members={memberOptions} labels={labels} />
+                <IssueForm workspaceSlug={workspaceSlug} projectKey={projectKey} members={memberOptions} />
               </CardContent>
             </Card>
           ) : null}

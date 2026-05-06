@@ -2,23 +2,25 @@ import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/permissions";
 import type { IssuePriorityValue, IssueStatusValue } from "@/lib/constants";
 
+export const PAGE_SIZE = 20;
+
 export type IssueFilterInput = {
   q?: string;
   status?: string;
   priority?: string;
   assignee?: string;
-  label?: string;
+  page?: number;
 };
 
 export async function getProjectPageData(workspaceSlug: string, projectKey: string, filters: IssueFilterInput = {}) {
   const context = await requireProject(workspaceSlug, projectKey);
+  const page = Math.max(1, filters.page ?? 1);
   const issueWhere = {
     projectId: context.project.id,
     ...(filters.status ? { status: filters.status as IssueStatusValue } : {}),
     ...(filters.priority ? { priority: filters.priority as IssuePriorityValue } : {}),
     ...(filters.assignee === "unassigned" ? { assigneeId: null } : {}),
     ...(filters.assignee && filters.assignee !== "unassigned" ? { assigneeId: filters.assignee } : {}),
-    ...(filters.label ? { labels: { some: { labelId: filters.label } } } : {}),
     ...(filters.q
       ? {
           OR: [
@@ -28,24 +30,23 @@ export async function getProjectPageData(workspaceSlug: string, projectKey: stri
         }
       : {}),
   };
-  const [members, labels, issues] = await Promise.all([
+  const [members, issues, totalIssues] = await Promise.all([
     prisma.projectMember.findMany({
       where: { projectId: context.project.id },
       include: { user: true },
       orderBy: { createdAt: "asc" },
     }),
-    prisma.label.findMany({
-      orderBy: { name: "asc" },
-    }),
     prisma.issue.findMany({
       where: issueWhere,
       include: {
         assignee: true,
-        labels: { include: { label: true } },
       },
       orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
+    prisma.issue.count({ where: issueWhere }),
   ]);
 
-  return { ...context, members, labels, issues };
+  return { ...context, members, issues, totalIssues, page, pageSize: PAGE_SIZE };
 }

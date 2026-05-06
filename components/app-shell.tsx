@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, SlidersHorizontal } from "lucide-react";
+import { LogOut, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import { logoutAction } from "@/lib/actions";
 import { auth } from "@/lib/auth";
 import { enforcePasswordReset } from "@/lib/password-guard";
@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { KiteLogo } from "@/components/kite-logo";
 import { WorkspaceNav } from "@/components/workspace-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function userInitial(name?: string | null, email?: string | null) {
   const source = name?.trim() || email?.trim() || "U";
@@ -47,9 +48,10 @@ export async function AppShell({
             {workspaceSlug ? <WorkspaceNav workspaceSlug={workspaceSlug} /> : null}
           </div>
           <div className="flex min-w-0 items-center gap-2">
+            <ThemeToggle />
             {isSystemAdmin ? (
               <Button asChild variant="outline" size="sm">
-                <Link href="/admin/labels" title="系统后台">
+                <Link href="/admin" title="系统后台">
                   <SlidersHorizontal className="h-4 w-4" />
                   <span className="hidden sm:inline">后台</span>
                 </Link>

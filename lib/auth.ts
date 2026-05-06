@@ -35,7 +35,6 @@ export const authConfig = {
           id: user.id,
           email: user.email,
           name: user.name,
-          image: user.image,
           systemRole: user.systemRole,
           mustChangePassword: user.mustChangePassword,
         };

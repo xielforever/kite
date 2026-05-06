@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default async function WorkspaceSettingsPage({ params }: { params: Promise<{ workspaceSlug: string }> }) {
   const { workspaceSlug } = await params;
@@ -26,6 +27,10 @@ export default async function WorkspaceSettingsPage({ params }: { params: Promis
             <div className="space-y-2">
               <Label htmlFor="slug">Slug</Label>
               <Input id="slug" name="slug" defaultValue={workspace.slug} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">描述</Label>
+              <Textarea id="description" name="description" defaultValue={workspace.description ?? ""} rows={3} placeholder="可选，简要描述工作区用途" />
             </div>
           </ActionForm>
         </CardContent>

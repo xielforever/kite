@@ -223,7 +223,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
               </div>
               <h2 className="mt-4 text-lg font-semibold">还没有项目</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                {canCreateProject ? "创建项目后，就可以添加任务、成员和标签。" : "当前账号还没有可访问的项目，请联系工作区管理员添加项目权限。"}
+                {canCreateProject ? "创建项目后，就可以添加任务和成员。" : "当前账号还没有可访问的项目，请联系工作区管理员添加项目权限。"}
               </p>
             </div>
           )}
@@ -250,7 +250,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
               </div>
               <div className="mt-3 space-y-3 text-sm text-muted-foreground">
                 <p>工作区管理员可以创建项目，并自动成为项目负责人。</p>
-                <p>项目负责人管理成员和标签；项目成员可处理任务；只读成员仅查看。</p>
+                <p>项目负责人管理成员；项目成员可处理任务；只读成员仅查看。</p>
               </div>
             </div>
             <div className="rounded-lg border bg-card p-4">

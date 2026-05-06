@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-const publicRoutes = ["/login", "/register"];
+const publicRoutes = ["/login", "/register", "/invite"];
+const adminRoutes = ["/admin"];
 
 function redirectToLogin(req: Parameters<Parameters<typeof auth>[0]>[0]) {
   const url = new URL("/login", req.nextUrl.origin);
@@ -28,6 +29,12 @@ export default auth((req) => {
 
   if (!hasValidSession && !isPublic) {
     return redirectToLogin(req);
+  }
+
+  if (hasValidSession && adminRoutes.some((route) => pathname.startsWith(route))) {
+    if (req.auth?.user?.systemRole !== "SUPER_ADMIN") {
+      return NextResponse.redirect(new URL("/forbidden", req.nextUrl.origin));
+    }
   }
 
   return NextResponse.next();
