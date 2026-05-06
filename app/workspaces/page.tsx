@@ -19,8 +19,8 @@ type WorkspaceCard = {
   currentRole: WorkspaceRoleValue;
   membershipId: string;
   viaSystemAdmin: boolean;
-  projects: unknown[];
-  members: unknown[];
+  projectCount: number;
+  memberCount: number;
 };
 
 function workspaceInitial(name: string) {
@@ -39,16 +39,20 @@ export default async function WorkspacesPage() {
     ? (
         await prisma.workspace.findMany({
           include: {
-            projects: true,
-            members: true,
+            _count: { select: { projects: true, members: true } },
           },
           orderBy: { createdAt: "asc" },
         })
       ).map((workspace) => ({
-        ...workspace,
-        currentRole: "OWNER",
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        createdAt: workspace.createdAt,
+        currentRole: "OWNER" as WorkspaceRoleValue,
         membershipId: workspace.id,
         viaSystemAdmin: true,
+        projectCount: workspace._count.projects,
+        memberCount: workspace._count.members,
       }))
     : (
         await prisma.workspaceMember.findMany({
@@ -56,22 +60,26 @@ export default async function WorkspacesPage() {
           include: {
             workspace: {
               include: {
-                projects: true,
-                members: true,
+                _count: { select: { projects: true, members: true } },
               },
             },
           },
           orderBy: { createdAt: "asc" },
         })
       ).map((membership) => ({
-        ...membership.workspace,
+        id: membership.workspace.id,
+        name: membership.workspace.name,
+        slug: membership.workspace.slug,
+        createdAt: membership.workspace.createdAt,
         currentRole: membership.role,
         membershipId: membership.id,
         viaSystemAdmin: false,
+        projectCount: membership.workspace._count.projects,
+        memberCount: membership.workspace._count.members,
       }));
 
-  const totalProjects = workspaceCards.reduce((sum, workspace) => sum + workspace.projects.length, 0);
-  const totalMembers = workspaceCards.reduce((sum, workspace) => sum + workspace.members.length, 0);
+  const totalProjects = workspaceCards.reduce((sum, workspace) => sum + workspace.projectCount, 0);
+  const totalMembers = workspaceCards.reduce((sum, workspace) => sum + workspace.memberCount, 0);
   const managedWorkspaces = workspaceCards.filter((workspace) => workspace.viaSystemAdmin || canManageWorkspace(workspace.currentRole)).length;
 
   return (
@@ -158,14 +166,14 @@ export default async function WorkspacesPage() {
                             <FolderKanban className="h-4 w-4" />
                             项目
                           </div>
-                          <div className="mt-1 font-semibold">{workspace.projects.length}</div>
+                          <div className="mt-1 font-semibold">{workspace.projectCount}</div>
                         </div>
                         <div className="bg-background px-3 py-2">
                           <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Users className="h-4 w-4" />
                             成员
                           </div>
-                          <div className="mt-1 font-semibold">{workspace.members.length}</div>
+                          <div className="mt-1 font-semibold">{workspace.memberCount}</div>
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2">

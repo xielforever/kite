@@ -33,7 +33,11 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
       ...(isWorkspaceAdmin ? {} : { members: { some: { userId: user.id } } }),
     },
     include: {
-      issues: true,
+      _count: {
+        select: {
+          issues: true,
+        },
+      },
       members: {
         include: { user: { select: userPublicFields } },
         orderBy: { createdAt: "asc" },
@@ -42,8 +46,18 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
     orderBy: { createdAt: "desc" },
   });
   const canCreateProject = isWorkspaceAdmin;
-  const totalIssues = projects.reduce((sum, project) => sum + project.issues.length, 0);
-  const doneIssues = projects.reduce((sum, project) => sum + project.issues.filter((issue) => issue.status === "DONE").length, 0);
+  const projectIds = projects.map((p) => p.id);
+  const issueCounts = projectIds.length
+    ? Object.fromEntries(
+        (await prisma.issue.groupBy({
+          by: ["projectId", "status"],
+          where: { projectId: { in: projectIds } },
+          _count: true,
+        })).map((r) => [`${r.projectId}:${r.status}`, r._count]),
+      )
+    : ({} as Record<string, number>);
+  const totalIssues = projects.reduce((sum, p) => sum + (p._count.issues ?? 0), 0);
+  const doneIssues = projects.reduce((sum, p) => sum + (issueCounts[`${p.id}:DONE`] ?? 0), 0);
   const openIssues = totalIssues - doneIssues;
   const uniqueMembers = new Set(projects.flatMap((project) => project.members.map((member) => member.userId))).size;
   const completionRate = percent(doneIssues, totalIssues);
@@ -101,10 +115,11 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             projects.map((project) => {
               const projectMembership = project.members.find((member) => member.userId === user.id);
               const canManage = isWorkspaceAdmin || canManageProject(projectMembership?.role);
-              const todoCount = project.issues.filter((issue) => issue.status === "TODO").length;
-              const inProgressCount = project.issues.filter((issue) => issue.status === "IN_PROGRESS").length;
-              const doneCount = project.issues.filter((issue) => issue.status === "DONE").length;
-              const projectCompletion = percent(doneCount, project.issues.length);
+              const todoCount = issueCounts[`${project.id}:TODO`] ?? 0;
+              const inProgressCount = issueCounts[`${project.id}:IN_PROGRESS`] ?? 0;
+              const doneCount = issueCounts[`${project.id}:DONE`] ?? 0;
+              const projectTotal = project._count.issues ?? 0;
+              const projectCompletion = percent(doneCount, projectTotal);
               const visibleMembers = project.members.slice(0, 4);
               const roleText = isWorkspaceAdmin ? "工作区管理" : projectMembership?.role ? projectRoleLabels[projectMembership.role] : "未加入";
 

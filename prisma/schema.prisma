@@ -55,6 +55,8 @@ model User {
   activities    IssueActivity[]
   accounts      Account[]
   sessions      Session[]
+
+  @@index([systemRole])
 }
 
 model Workspace {
@@ -69,6 +71,8 @@ model Workspace {
   projects    Project[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
+  @@index([createdById])
 }
 
 model WorkspaceInvitation {
@@ -153,6 +157,7 @@ model Issue {
 
   @@index([projectId, status, sortOrder])
   @@index([assigneeId])
+  @@index([creatorId])
   @@unique([projectId, number])
 }
 
@@ -167,6 +172,7 @@ model IssueComment {
   updatedAt DateTime @updatedAt
 
   @@index([issueId])
+  @@index([authorId])
 }
 
 model IssueActivity {
@@ -180,6 +186,7 @@ model IssueActivity {
   createdAt DateTime @default(now())
 
   @@index([issueId, createdAt])
+  @@index([actorId])
 }
 
 model Account {
