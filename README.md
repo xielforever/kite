@@ -10,11 +10,39 @@ Kite 是一个面向内部团队的轻量项目管理系统，首版提供多工
 
 ## 本地开发
 
+### 数据库准备
+
+使用 PostgreSQL 15+，首先创建数据库和用户：
+
+```bash
+# 方式 1：使用提供的 SQL 脚本（推荐）
+psql -U postgres -f prisma/setup-database.sql
+
+# 方式 2：手动执行
+psql -U postgres
+```
+
+```sql
+-- 手动执行
+CREATE DATABASE kite;
+CREATE USER kite_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE kite TO kite_user;
+\c kite;
+GRANT ALL ON SCHEMA public TO kite_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO kite_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kite_user;
+\q
+```
+
+### 项目初始化
+
 ```bash
 corepack enable
 corepack prepare pnpm@9.15.4 --activate
 pnpm install
 cp .env.example .env
+# 修改 .env 中的 DATABASE_URL 为实际值，例如：
+# DATABASE_URL="postgresql://kite_user:your_password@localhost:5432/kite?schema=public"
 pnpm prisma:migrate
 pnpm dev
 ```
