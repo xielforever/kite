@@ -1,10 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export function Pagination({ total, pageSize, currentPage }: { total: number; pageSize: number; currentPage: number }) {
+function PaginationInner({ total, pageSize, currentPage }: { total: number; pageSize: number; currentPage: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const totalPages = Math.ceil(total / pageSize);
@@ -37,7 +38,7 @@ export function Pagination({ total, pageSize, currentPage }: { total: number; pa
         共 {total} 条，第 {currentPage}/{totalPages} 页
       </span>
       <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => goTo(currentPage - 1)}>
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => goTo(currentPage - 1)} aria-label="上一页">
           <ChevronLeft className="h-4 w-4" />
         </Button>
         {pages.map((page, index) =>
@@ -50,15 +51,24 @@ export function Pagination({ total, pageSize, currentPage }: { total: number; pa
               size="icon"
               className="h-8 w-8"
               onClick={() => goTo(page)}
+              aria-label={`第 ${page} 页`}
             >
               {page}
             </Button>
           ),
         )}
-        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => goTo(currentPage + 1)}>
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => goTo(currentPage + 1)} aria-label="下一页">
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
     </div>
+  );
+}
+
+export function Pagination({ total, pageSize, currentPage }: { total: number; pageSize: number; currentPage: number }) {
+  return (
+    <Suspense fallback={<div className="py-2" />}>
+      <PaginationInner total={total} pageSize={pageSize} currentPage={currentPage} />
+    </Suspense>
   );
 }

@@ -2,16 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 
-export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold">操作失败</h1>
-        <p className="mt-2 text-sm text-muted-foreground">请刷新后重试，或返回上一页检查输入。</p>
-        <Button className="mt-6" onClick={reset}>
-          重试
-        </Button>
+        <h2 className="text-xl font-semibold">出了点问题</h2>
+        <p className="mt-2 text-sm text-muted-foreground">页面加载时发生了意外错误，请尝试刷新。</p>
+        <div className="mt-4">
+          <Button onClick={reset}>重试</Button>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

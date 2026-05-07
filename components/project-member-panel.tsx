@@ -38,7 +38,7 @@ export function ProjectMemberPanel({
                   }}
                   className="flex items-center gap-2"
                 >
-                  <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm">
+                  <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的项目角色`}>
                     {projectRoles.map((role) => (
                       <option key={role} value={role}>
                         {projectRoleLabels[role]}

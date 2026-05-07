@@ -86,7 +86,7 @@ export default async function AdminPage() {
                   <tr key={user.id} className="border-b last:border-0">
                     <td className="py-2.5 pr-4 font-medium">
                       {user.name}
-                      {user.mustChangePassword ? <span className="ml-1 text-xs text-orange-500">待改密</span> : null}
+                      {user.mustChangePassword ? <span className="ml-1 text-xs text-orange-500 dark:text-orange-400">待改密</span> : null}
                     </td>
                     <td className="py-2.5 pr-4 text-muted-foreground">{user.email}</td>
                     <td className="py-2.5 pr-4">
@@ -96,6 +96,7 @@ export default async function AdminPage() {
                           name="systemRole"
                           defaultValue={user.systemRole}
                           className="h-8 rounded-md border bg-background px-2 text-xs"
+                          aria-label={`修改 ${user.name} 的系统角色`}
                         >
                           {systemRoles.map((role) => (
                             <option key={role} value={role}>{systemRoleLabels[role]}</option>
@@ -116,7 +117,7 @@ export default async function AdminPage() {
                           <ActionForm action={adminResetPasswordAction} submitLabel="重置" pendingLabel="重置中...">
                             <input type="hidden" name="userId" value={user.id} />
                             <div className="flex items-center gap-2">
-                              <Input name="newPassword" type="password" placeholder="新密码（至少8位）" className="h-8 w-44 text-xs" required />
+                              <Input name="newPassword" type="password" placeholder="新密码（至少8位）" className="h-8 w-44 text-xs" aria-label={`重置 ${user.name} 的密码`} required />
                             </div>
                           </ActionForm>
                         </div>

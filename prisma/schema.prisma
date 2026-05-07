@@ -54,6 +54,7 @@ model User {
   comments      IssueComment[]
   activities    IssueActivity[]
   accounts      Account[]
+  auditLogs     AuditLog[]
   sessions      Session[]
 
   @@index([systemRole])
@@ -187,6 +188,20 @@ model IssueActivity {
 
   @@index([issueId, createdAt])
   @@index([actorId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  targetId  String?
+  detail    String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model Account {

@@ -1,22 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore, useCallback } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+function getThemeSnapshot() {
+  if (typeof window === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+function subscribe(callback: () => void) {
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+
 export function ThemeToggle() {
-  const [dark, setDark] = useState(false);
+  const dark = useSyncExternalStore(subscribe, getThemeSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  function toggle() {
+  const toggle = useCallback(() => {
     const next = !dark;
-    setDark(next);
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("kite-theme", next ? "dark" : "light");
-  }
+  }, [dark]);
 
   return (
     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} title={dark ? "切换亮色" : "切换暗色"}>

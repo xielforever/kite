@@ -21,6 +21,8 @@
   --input: 214 32% 91%;
   --ring: 221 83% 53%;
   --radius: 0.5rem;
+  --kite-fill-start: #EFF6FF;
+  --kite-fill-end: #E0F2FE;
 }
 
 .dark {
@@ -41,6 +43,8 @@
   --border: 217 33% 17%;
   --input: 217 33% 17%;
   --ring: 217 91% 60%;
+  --kite-fill-start: #1E3A5F;
+  --kite-fill-end: #1A365D;
 }
 
 * {

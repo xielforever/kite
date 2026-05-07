@@ -50,7 +50,7 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
                         "use server";
                         await updateMemberRoleAction(workspaceSlug, member.id, formData.get("role") as WorkspaceRoleValue);
                       }}>
-                        <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm">
+                        <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的角色`}>
                           {workspaceRoles.map((role) => (
                             <option key={role} value={role}>{roleLabels[role]}</option>
                           ))}
@@ -129,12 +129,12 @@ export default async function MembersPage({ params }: { params: Promise<{ worksp
               <CardContent>
                 <ActionForm action={addMember} submitLabel="添加">
                   <div className="space-y-2">
-                    <Label htmlFor="email">成员邮箱</Label>
-                    <Input id="email" name="email" type="email" required />
+                    <Label htmlFor="add-member-email">成员邮箱</Label>
+                    <Input id="add-member-email" name="email" type="email" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="role">角色</Label>
-                    <select id="role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+                    <Label htmlFor="add-member-role">角色</Label>
+                    <select id="add-member-role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
                       {(isOwner ? workspaceRoles : workspaceRoles.filter((r) => r === "MEMBER")).map((role) => (
                         <option key={role} value={role}>{roleLabels[role]}</option>
                       ))}

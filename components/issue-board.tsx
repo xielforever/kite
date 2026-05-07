@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DndContext, DragEndEvent, PointerSensor, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { statusColumns, statusLabels, type IssueStatusValue } from "@/lib/constants";
 import { IssueCard, type IssueCardData } from "@/components/issue-card";
@@ -55,7 +55,10 @@ export function IssueBoard({
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const grouped = useMemo(() => statusColumns.reduce<Record<IssueStatusValue, BoardIssue[]>>((acc, status) => {
     acc[status] = localIssues.filter((issue) => issue.status === status);
     return acc;

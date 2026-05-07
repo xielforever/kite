@@ -1,9 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { priorityLabels, statusLabels } from "@/lib/constants";
 
-export function IssueFilters({
+function IssueFiltersInner({
   members,
 }: {
   members: { id: string; name: string }[];
@@ -24,24 +25,25 @@ export function IssueFilters({
         className="h-9 rounded-md border bg-background px-3 text-sm"
         defaultValue={searchParams.get("q") ?? ""}
         placeholder="搜索任务"
+        aria-label="搜索任务"
         onKeyDown={(event) => {
           if (event.key === "Enter") updateFilter("q", event.currentTarget.value);
         }}
         onBlur={(event) => updateFilter("q", event.currentTarget.value)}
       />
-      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("status") ?? ""} onChange={(event) => updateFilter("status", event.target.value)}>
+      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("status") ?? ""} onChange={(event) => updateFilter("status", event.target.value)} aria-label="状态筛选">
         <option value="">全部状态</option>
         {Object.entries(statusLabels).map(([value, label]) => (
           <option key={value} value={value}>{label}</option>
         ))}
       </select>
-      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("priority") ?? ""} onChange={(event) => updateFilter("priority", event.target.value)}>
+      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("priority") ?? ""} onChange={(event) => updateFilter("priority", event.target.value)} aria-label="优先级筛选">
         <option value="">全部优先级</option>
         {Object.entries(priorityLabels).map(([value, label]) => (
           <option key={value} value={value}>{label}</option>
         ))}
       </select>
-      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("assignee") ?? ""} onChange={(event) => updateFilter("assignee", event.target.value)}>
+      <select className="h-9 rounded-md border bg-background px-3 text-sm" defaultValue={searchParams.get("assignee") ?? ""} onChange={(event) => updateFilter("assignee", event.target.value)} aria-label="负责人筛选">
         <option value="">全部负责人</option>
         <option value="unassigned">未分配</option>
         {members.map((member) => (
@@ -49,5 +51,13 @@ export function IssueFilters({
         ))}
       </select>
     </div>
+  );
+}
+
+export function IssueFilters({ members }: { members: { id: string; name: string }[] }) {
+  return (
+    <Suspense fallback={<div className="mb-4 h-[52px] rounded-lg border bg-card p-3" />}>
+      <IssueFiltersInner members={members} />
+    </Suspense>
   );
 }

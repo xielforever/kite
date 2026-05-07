@@ -59,7 +59,12 @@ function formValue(formData: FormData, key: string) {
 
 function actionError(error: unknown): ActionState {
   if (error instanceof ForbiddenError) return { error: error.message };
-  if (error instanceof Error) return { error: error.message };
+  if (error instanceof Error) {
+    const msg = error.message;
+    if (msg.length > 200) return { error: "操作失败，请稍后重试" };
+    if (/prisma|Prisma|database|connection|ECONNREFUSED|ETIMEDOUT|sequelize|knex|drizzle/i.test(msg)) return { error: "操作失败，请稍后重试" };
+    return { error: msg };
+  }
   return { error: "操作失败，请稍后重试" };
 }
 
@@ -237,10 +242,13 @@ export async function addMemberAction(workspaceSlug: string, _state: ActionState
           select: { id: true },
         });
         if (projects.length) {
-          await tx.projectMember.createMany({
-            data: projects.map((project) => ({ projectId: project.id, userId: user.id, role: "LEAD" })),
-            skipDuplicates: true,
-          });
+          for (const project of projects) {
+            await tx.projectMember.upsert({
+              where: { projectId_userId: { projectId: project.id, userId: user.id } },
+              update: { role: "LEAD" },
+              create: { projectId: project.id, userId: user.id, role: "LEAD" },
+            });
+          }
         }
       }
     });
@@ -298,10 +306,11 @@ export async function acceptInvitationAction(token: string) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const locked = await tx.workspaceInvitation.findUnique({
-      where: { id: invitation.id },
+    const updateResult = await tx.workspaceInvitation.updateMany({
+      where: { id: invitation.id, acceptedAt: null },
+      data: { acceptedAt: new Date() },
     });
-    if (!locked || locked.acceptedAt) throw new ForbiddenError("邀请已被使用");
+    if (updateResult.count === 0) throw new ForbiddenError("邀请已被使用");
 
     const existing = await tx.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } },
@@ -321,10 +330,21 @@ export async function acceptInvitationAction(token: string) {
       });
     }
 
-    await tx.workspaceInvitation.update({
-      where: { id: invitation.id },
-      data: { acceptedAt: new Date() },
-    });
+    if (invitation.role === "OWNER" || invitation.role === "ADMIN") {
+      const projects = await tx.project.findMany({
+        where: { workspaceId: invitation.workspaceId },
+        select: { id: true },
+      });
+      if (projects.length) {
+        for (const project of projects) {
+          await tx.projectMember.upsert({
+            where: { projectId_userId: { projectId: project.id, userId: user.id } },
+            update: { role: "LEAD" },
+            create: { projectId: project.id, userId: user.id, role: "LEAD" },
+          });
+        }
+      }
+    }
 
     return invitation.workspace.slug;
   });
@@ -396,6 +416,7 @@ export async function createProjectAction(workspaceSlug: string, _state: ActionS
 
 export async function archiveProjectAction(workspaceSlug: string, projectKeyValue: string) {
   const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
+  if (project.archived) return;
   await prisma.project.update({ where: { id: project.id }, data: { archived: true } });
   revalidatePath(`/w/${workspaceSlug}/projects`);
 }
@@ -576,6 +597,8 @@ export async function moveIssue(input: unknown) {
     }),
   ]);
   revalidatePath(`/w/${issue.project.workspace.slug}/projects/${issue.project.key}`);
+  revalidatePath(`/w/${issue.project.workspace.slug}/projects/${issue.project.key}/board`);
+  revalidatePath(`/w/${issue.project.workspace.slug}/projects/${issue.project.key}/issues`);
 }
 
 export async function createCommentAction(workspaceSlug: string, projectKeyValue: string, issueId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
@@ -596,7 +619,7 @@ export async function createCommentAction(workspaceSlug: string, projectKeyValue
   return { ok: true };
 }
 
-export async function deleteCommentAction(workspaceSlug: string, projectKeyValue: string, commentId: string) {
+export async function deleteCommentAction(workspaceSlug: string, projectKeyValue: string, issueId: string, commentId: string) {
   const { user, project } = await requireProject(workspaceSlug, projectKeyValue);
   const comment = await prisma.issueComment.findFirst({
     where: { id: commentId, issue: { projectId: project.id } },
@@ -604,6 +627,7 @@ export async function deleteCommentAction(workspaceSlug: string, projectKeyValue
   if (!comment) return;
   if (comment.authorId !== user.id) throw new ForbiddenError("只能删除自己的评论");
   await prisma.issueComment.delete({ where: { id: commentId } });
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues/${issueId}`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/board`);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues`);
@@ -624,6 +648,7 @@ export async function updateCommentAction(workspaceSlug: string, projectKeyValue
     data: { body: parsed.data.body },
   });
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues/${comment.issueId}`);
   return { ok: true };
 }
 
@@ -720,6 +745,7 @@ export async function updatePasswordAction(_state: ActionState, formData: FormDa
     data: { passwordHash: await hash(parsed.data.newPassword, 12), mustChangePassword: false },
   });
   revalidatePath("/setup/change-password");
+  revalidatePath("/settings/profile");
   revalidatePath("/");
   return { ok: true };
 }
@@ -744,16 +770,16 @@ export async function adminUpdateUserRoleAction(_state: ActionState, formData: F
   if (target.systemRole === "SUPER_ADMIN" && parsed.data.systemRole !== "SUPER_ADMIN" && superAdminCount <= 1) {
     return { error: "系统至少需要一位超级管理员" };
   }
-  await prisma.user.update({
-    where: { id: parsed.data.userId },
-    data: { systemRole: parsed.data.systemRole },
-  });
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: parsed.data.userId }, data: { systemRole: parsed.data.systemRole } }),
+    prisma.auditLog.create({ data: { actorId: admin.id, action: "ADMIN_UPDATE_ROLE", targetId: parsed.data.userId, detail: `${target.systemRole} → ${parsed.data.systemRole}` } }),
+  ]);
   revalidatePath("/admin");
   return { ok: true };
 }
 
 export async function adminResetPasswordAction(_state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireSystemAdmin();
+  const adminUser = await requireSystemAdmin();
   const parsed = adminResetPasswordSchema.safeParse({
     userId: formValue(formData, "userId"),
     newPassword: formValue(formData, "newPassword"),
@@ -761,10 +787,11 @@ export async function adminResetPasswordAction(_state: ActionState, formData: Fo
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
   const target = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { id: true } });
   if (!target) return { error: "用户不存在" };
-  await prisma.user.update({
-    where: { id: parsed.data.userId },
-    data: { passwordHash: await hash(parsed.data.newPassword, 12), mustChangePassword: true },
-  });
+  const hashed = await hash(parsed.data.newPassword, 12);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: parsed.data.userId }, data: { passwordHash: hashed, mustChangePassword: true } }),
+    prisma.auditLog.create({ data: { actorId: adminUser.id, action: "ADMIN_RESET_PASSWORD", targetId: parsed.data.userId } }),
+  ]);
   revalidatePath("/admin");
   return { ok: true };
 }

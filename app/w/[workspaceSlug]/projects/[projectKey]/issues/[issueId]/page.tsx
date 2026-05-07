@@ -93,7 +93,7 @@ export default async function IssueDetailPage({
                       <form
                         action={async () => {
                           "use server";
-                          await deleteCommentAction(workspaceSlug, projectKey, comment.id);
+                          await deleteCommentAction(workspaceSlug, projectKey, issueId, comment.id);
                         }}
                       >
                         <ConfirmSubmitButton size="icon" variant="ghost" title="删除评论" message="确定删除这条评论？">

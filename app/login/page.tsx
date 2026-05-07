@@ -35,7 +35,7 @@ export default async function LoginPage({
         </CardHeader>
         <CardContent>
           {params.reason === "expired" ? (
-            <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
               登录状态已失效，请重新登录。
             </p>
           ) : null}
