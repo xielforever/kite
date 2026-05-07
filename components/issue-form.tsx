@@ -36,25 +36,25 @@ export function IssueForm({
   return (
     <ActionForm action={action} submitLabel={defaults ? "保存任务" : "创建任务"}>
       <div className="space-y-2">
-        <Label htmlFor="title">标题</Label>
-        <Input id="title" name="title" defaultValue={defaults?.title} required />
+        <Label htmlFor="issue-title">标题</Label>
+        <Input id="issue-title" name="title" defaultValue={defaults?.title} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="description">描述</Label>
-        <Textarea id="description" name="description" defaultValue={defaults?.description ?? ""} rows={4} />
+        <Label htmlFor="issue-description">描述</Label>
+        <Textarea id="issue-description" name="description" defaultValue={defaults?.description ?? ""} rows={4} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="status">状态</Label>
-          <select id="status" name="status" defaultValue={defaults?.status ?? "TODO"} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+          <Label htmlFor="issue-status">状态</Label>
+          <select id="issue-status" name="status" defaultValue={defaults?.status ?? "TODO"} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
             {Object.entries(statusLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="priority">优先级</Label>
-          <select id="priority" name="priority" defaultValue={defaults?.priority ?? "MEDIUM"} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+          <Label htmlFor="issue-priority">优先级</Label>
+          <select id="issue-priority" name="priority" defaultValue={defaults?.priority ?? "MEDIUM"} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
             {Object.entries(priorityLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
@@ -63,8 +63,8 @@ export function IssueForm({
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="assigneeId">负责人</Label>
-          <select id="assigneeId" name="assigneeId" defaultValue={defaults?.assigneeId ?? ""} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+          <Label htmlFor="issue-assignee">负责人</Label>
+          <select id="issue-assignee" name="assigneeId" defaultValue={defaults?.assigneeId ?? ""} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
             <option value="">未分配</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>{member.name}</option>
@@ -72,9 +72,9 @@ export function IssueForm({
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="dueDate">截止日期</Label>
+          <Label htmlFor="issue-due-date">截止日期</Label>
           <Input
-            id="dueDate"
+            id="issue-due-date"
             name="dueDate"
             type="date"
             defaultValue={defaults?.dueDate ? new Date(defaults.dueDate).toISOString().slice(0, 10) : ""}

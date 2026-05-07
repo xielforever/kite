@@ -16,16 +16,16 @@ export function ProjectForm({ workspaceSlug }: { workspaceSlug: string }) {
   return (
     <ActionForm action={action} submitLabel="创建项目">
       <div className="space-y-2">
-        <Label htmlFor="name">项目名称</Label>
-        <Input id="name" name="name" value={name} onChange={(event) => setName(event.target.value)} required />
+        <Label htmlFor="new-project-name">项目名称</Label>
+        <Input id="new-project-name" name="name" value={name} onChange={(event) => setName(event.target.value)} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="key">项目 Key</Label>
-        <Input id="key" name="key" defaultValue={defaultKey} placeholder="PL" required />
+        <Label htmlFor="new-project-key">项目 Key</Label>
+        <Input id="new-project-key" name="key" defaultValue={defaultKey} placeholder="PL" required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="description">描述</Label>
-        <Textarea id="description" name="description" rows={3} />
+        <Label htmlFor="new-project-description">描述</Label>
+        <Textarea id="new-project-description" name="description" rows={3} />
       </div>
     </ActionForm>
   );

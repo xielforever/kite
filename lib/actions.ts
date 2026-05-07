@@ -364,7 +364,24 @@ export async function updateMemberRoleAction(workspaceSlug: string, memberId: st
     const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
     if (ownerCount <= 1) throw new ForbiddenError("不能降级最后一个所有者");
   }
-  await prisma.workspaceMember.update({ where: { id: memberId }, data: { role } });
+  await prisma.$transaction(async (tx) => {
+    await tx.workspaceMember.update({ where: { id: memberId }, data: { role } });
+    if (role === "OWNER" || role === "ADMIN") {
+      const projects = await tx.project.findMany({
+        where: { workspaceId: workspace.id },
+        select: { id: true },
+      });
+      if (projects.length) {
+        for (const project of projects) {
+          await tx.projectMember.upsert({
+            where: { projectId_userId: { projectId: project.id, userId: target.userId } },
+            update: { role: "LEAD" },
+            create: { projectId: project.id, userId: target.userId, role: "LEAD" },
+          });
+        }
+      }
+    }
+  });
   revalidatePath(`/w/${workspaceSlug}/settings/members`);
 }
 
@@ -379,7 +396,12 @@ export async function removeMemberAction(workspaceSlug: string, memberId: string
     const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
     if (ownerCount <= 1) throw new ForbiddenError("不能移除最后一个所有者");
   }
-  await prisma.workspaceMember.delete({ where: { id: memberId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.projectMember.deleteMany({
+      where: { userId: target.userId, project: { workspaceId: workspace.id } },
+    });
+    await tx.workspaceMember.delete({ where: { id: memberId } });
+  });
   revalidatePath(`/w/${workspaceSlug}/settings/members`);
 }
 
