@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { edgeAuthConfig } from "@/lib/auth";
+
+const { auth } = NextAuth(edgeAuthConfig);
 
 const publicRoutes = ["/login", "/register", "/invite"];
 const adminRoutes = ["/admin"];
@@ -42,5 +45,4 @@ export default auth((req) => {
 
 export const config = {
   matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
-  runtime: "nodejs",
 };
