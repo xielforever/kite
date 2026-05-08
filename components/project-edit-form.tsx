@@ -12,7 +12,7 @@ export function ProjectEditForm({
   onSuccess,
 }: {
   workspaceSlug: string;
-  project: { id: string; name: string; key: string; description?: string | null; defaultDueDays?: number | null; autoJoin?: boolean };
+  project: { id: string; name: string; key: string; description?: string | null; defaultDueDays?: number | null };
   onSuccess?: () => void;
 }) {
   const action = updateProjectAction.bind(null, workspaceSlug, project.id);
@@ -25,7 +25,7 @@ export function ProjectEditForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor={`project-key-${project.id}`}>Key</Label>
-        <Input id={`project-key-${project.id}`} name="key" defaultValue={project.key} readOnly className="bg-muted cursor-not-allowed" />
+        <Input id={`project-key-${project.id}`} name="key" defaultValue={project.key} readOnly className="cursor-not-allowed bg-muted" />
         <p className="text-xs text-muted-foreground">项目 Key 创建后不可修改</p>
       </div>
       <div className="space-y-2">
@@ -45,18 +45,6 @@ export function ProjectEditForm({
         />
         <p className="text-xs text-muted-foreground">新建任务时自动设置截止日期为创建后的 N 天</p>
       </div>
-      <div className="flex items-center gap-2">
-        <input
-          id={`project-auto-join-${project.id}`}
-          name="autoJoin"
-          type="checkbox"
-          defaultChecked={project.autoJoin ?? false}
-          value="on"
-          className="h-4 w-4 rounded border"
-        />
-        <Label htmlFor={`project-auto-join-${project.id}`} className="cursor-pointer">新成员自动加入此项目</Label>
-      </div>
-      <p className="text-xs text-muted-foreground">开启后，新加入工作区的成员将自动成为此项目的成员</p>
     </ActionForm>
   );
 }

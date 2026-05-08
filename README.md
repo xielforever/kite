@@ -52,7 +52,7 @@ http://localhost:3000/setup
 
 1. 验证数据源：填写 PG 地址、端口、用户名、密码、数据库名，并验证连接和建表权限。
 2. 执行迁移：执行 `prisma migrate deploy`。
-3. 创建管理员：创建第一个 `SUPER_ADMIN` 和默认工作区。
+3. 创建管理员：创建第一个 `SUPER_ADMIN`、默认工作区和默认项目，并写入 `AUTH_URL`。
 
 初始化成功后，当前页面会锁定，防止重复提交。服务重启后，已初始化环境访问 `/setup` 会重定向到登录页。
 
@@ -102,6 +102,14 @@ DATABASE_URL="postgresql://kite_user:your_password@localhost:5432/kite?schema=pu
 AUTH_SECRET="replace-with-a-long-random-secret"
 AUTH_URL="https://tasks.example.com"
 ```
+
+远程访问时不要把 `AUTH_URL` 设置为 `http://localhost:3000`。如果通过服务器 IP 访问，可以设置为：
+
+```env
+AUTH_URL="http://<server-ip>:3000"
+```
+
+否则认证流程可能把浏览器重定向回访问者本机的 `localhost:3000`。
 
 生成 `AUTH_SECRET`：
 
@@ -167,7 +175,7 @@ sudo systemctl restart kite
 - `DONE`：已完成
 - `CLOSED`：已关闭
 
-状态流转由系统限制，避免通过普通编辑绕过任务生命周期。
+状态流转由系统限制，避免通过普通编辑绕过任务生命周期。普通编辑只更新标题、描述、优先级、负责人和截止日期，并在活动记录中写入字段级变化。
 
 ## 项目脚本
 
@@ -179,10 +187,13 @@ npm run lint             # ESLint
 npm run test             # Vitest
 npm run prisma:deploy    # 执行生产迁移
 npm run prisma:migrate   # 本地开发迁移
+npm run check:migrations # 检查 schema 与迁移历史是否一致
 npm run clear-db         # 清空业务数据，保留迁移记录
 npm run reset-db         # 清空并写入本地默认管理员
 npm run seed:demo        # 写入演示数据
 ```
+
+`check:migrations` 需要可用的 PostgreSQL shadow database。默认会尝试使用当前本地库名追加 `_shadow`，例如 `kite_shadow`；如果数据库用户没有 `CREATE DATABASE` 权限，请手动创建 shadow 库或设置 `SHADOW_DATABASE_URL`。
 
 ## 边界说明
 

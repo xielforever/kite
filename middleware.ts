@@ -4,12 +4,11 @@ import { edgeAuthConfig } from "@/lib/auth";
 
 const { auth } = NextAuth(edgeAuthConfig);
 
-const publicRoutes = ["/login", "/register", "/invite"];
-const adminRoutes = ["/admin"];
+const publicRoutes = ["/login", "/register"];
 
 function redirectToLogin(req: Parameters<Parameters<typeof auth>[0]>[0]) {
   const url = new URL("/login", req.nextUrl.origin);
-  url.searchParams.set("callbackUrl", req.nextUrl.href);
+  url.searchParams.set("callbackUrl", `${req.nextUrl.pathname}${req.nextUrl.search}`);
   url.searchParams.set("reason", "expired");
   const response = NextResponse.redirect(url);
   for (const name of [
@@ -32,12 +31,6 @@ export default auth((req) => {
 
   if (!hasValidSession && !isPublic) {
     return redirectToLogin(req);
-  }
-
-  if (hasValidSession && adminRoutes.some((route) => pathname.startsWith(route))) {
-    if (req.auth?.user?.systemRole !== "SUPER_ADMIN") {
-      return NextResponse.redirect(new URL("/forbidden", req.nextUrl.origin));
-    }
   }
 
   return NextResponse.next();

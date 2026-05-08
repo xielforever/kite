@@ -23,7 +23,6 @@ const demoUsers: {
 ] as const;
 
 type UserKey = (typeof demoUsers)[number]["key"];
-type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
 type ProjectRoleValue = "LEAD" | "MEMBER" | "VIEWER";
 type IssueStatusValue = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE" | "CLOSED";
 type IssuePriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -47,14 +46,6 @@ type DemoProject = {
   members: Partial<Record<UserKey, ProjectRoleValue>>;
   issues: DemoIssue[];
 };
-
-const workspaceMembers: { key: UserKey; role: WorkspaceRoleValue }[] = [
-  { key: "owner", role: "OWNER" },
-  { key: "admin", role: "ADMIN" },
-  { key: "lead", role: "MEMBER" },
-  { key: "member", role: "MEMBER" },
-  { key: "viewer", role: "MEMBER" },
-];
 
 const projectSeeds: DemoProject[] = [
   {
@@ -326,14 +317,6 @@ async function main() {
       },
     });
 
-    await tx.workspaceMember.createMany({
-      data: workspaceMembers.map((member) => ({
-        workspaceId: workspace.id,
-        userId: users[member.key].id,
-        role: member.role,
-      })),
-    });
-
     let issueCount = 0;
     let commentCount = 0;
     let activityCount = 0;
@@ -415,7 +398,6 @@ async function main() {
     return {
       workspaceSlug: workspace.slug,
       userCount: demoUsers.length,
-      workspaceMemberCount: workspaceMembers.length,
       projectCount: projectSeeds.length,
       issueCount,
       commentCount,
@@ -426,19 +408,18 @@ async function main() {
   console.log("Kite demo seed complete.");
   console.log(`Workspace: ${result.workspaceSlug}`);
   console.log(`Created/updated users: ${result.userCount}`);
-  console.log(`Workspace members: ${result.workspaceMemberCount}`);
   console.log(`Projects: ${result.projectCount}`);
   console.log(`Issues: ${result.issueCount}`);
   console.log(`Comments: ${result.commentCount}`);
   console.log(`Activities: ${result.activityCount}`);
   console.log("");
   console.log("Login accounts (password: plane):");
-  console.log("- owner@example.com      张无忌, workspace OWNER, can see/manage all projects");
-  console.log("- pm-admin@example.com   赵敏, workspace ADMIN, can see/manage all projects");
-  console.log("- lead@example.com       周芷若, workspace MEMBER, PLAT LEAD, ARCH MEMBER");
-  console.log("- member@example.com     殷离, workspace MEMBER, PLAT MEMBER, OPS LEAD");
-  console.log("- viewer@example.com     小昭, workspace MEMBER, PLAT/OPS VIEWER");
-  console.log("- outsider@example.com   宋青书, no workspace membership");
+  console.log("- owner@example.com      张无忌, SUPER_ADMIN, can see/manage all projects");
+  console.log("- pm-admin@example.com   赵敏, PLAT/OPS/MKT LEAD");
+  console.log("- lead@example.com       周芷若, PLAT LEAD, ARCH MEMBER");
+  console.log("- member@example.com     殷离, PLAT MEMBER, OPS LEAD");
+  console.log("- viewer@example.com     小昭, PLAT/OPS VIEWER");
+  console.log("- outsider@example.com   宋青书, no project membership");
 }
 
 main()

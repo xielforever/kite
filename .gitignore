@@ -7,5 +7,6 @@ dist
 *.tsbuildinfo
 .npm-cache
 .next-dev*.log
+.next-start*.log
 test-results
 playwright-report

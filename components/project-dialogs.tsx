@@ -25,7 +25,7 @@ export function CreateProjectDialog({ workspaceSlug }: { workspaceSlug: string }
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>新建项目</DialogTitle>
-          <DialogDescription>创建项目后，你会自动成为项目负责人。</DialogDescription>
+          <DialogDescription>创建项目时必须指定项目负责人，负责人会以 LEAD 角色加入项目。</DialogDescription>
         </DialogHeader>
         <ProjectForm workspaceSlug={workspaceSlug} onSuccess={() => setOpen(false)} />
       </DialogContent>
@@ -109,7 +109,7 @@ export function ProjectSettingsDialog({
   project,
 }: {
   workspaceSlug: string;
-  project: { id: string; name: string; key: string; description?: string | null; defaultDueDays?: number | null; autoJoin?: boolean };
+  project: { id: string; name: string; key: string; description?: string | null; defaultDueDays?: number | null };
 }) {
   const [open, setOpen] = useState(false);
 

@@ -72,7 +72,7 @@ export default async function IssueDetailPage({
                     <p className="font-medium">{activity.actor?.name ?? "已删除用户"} · {activity.action}</p>
                     <p className="text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
                   </div>
-                  {activity.detail ? <p className="mt-1 text-muted-foreground">{activity.detail}</p> : null}
+                  {activity.detail ? <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{activity.detail}</p> : null}
                 </div>
               ))}
               {!issue.activities.length ? <p className="text-sm text-muted-foreground">暂无活动记录</p> : null}

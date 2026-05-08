@@ -1,6 +1,3 @@
-export const workspaceRoles = ["OWNER", "ADMIN", "MEMBER"] as const;
-export type WorkspaceRoleValue = (typeof workspaceRoles)[number];
-
 export const systemRoles = ["SUPER_ADMIN", "USER"] as const;
 export type SystemRoleValue = (typeof systemRoles)[number];
 
@@ -48,12 +45,6 @@ export const priorityLabels: Record<IssuePriorityValue, string> = {
   MEDIUM: "中",
   HIGH: "高",
   URGENT: "紧急",
-};
-
-export const roleLabels: Record<WorkspaceRoleValue, string> = {
-  OWNER: "工作区所有者",
-  ADMIN: "工作区管理员",
-  MEMBER: "工作区成员",
 };
 
 export const systemRoleLabels: Record<SystemRoleValue, string> = {

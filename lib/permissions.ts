@@ -5,11 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { canAccessAllWorkspaces, canCreateWorkspace, canEditProjectContent, canManageProject } from "@/lib/role-rules";
 export {
   canAccessAllWorkspaces,
-  canChangeRole,
   canCreateWorkspace,
   canEditProjectContent,
   canManageProject,
-  canManageWorkspace,
 } from "@/lib/role-rules";
 
 export class ForbiddenError extends Error {

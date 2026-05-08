@@ -17,12 +17,6 @@ async function main() {
     create: { name: "光明顶工作区", slug: "demo", createdById: user.id },
   });
 
-  await prisma.workspaceMember.upsert({
-    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
-    update: { role: "OWNER" },
-    create: { workspaceId: workspace.id, userId: user.id, role: "OWNER" },
-  });
-
   const project = await prisma.project.upsert({
     where: { workspaceId_key: { workspaceId: workspace.id, key: "DEMO" } },
     update: { name: "明教总坛", description: "用于快速体验 Kite 的任务流转、看板和成员协作。", archived: false },

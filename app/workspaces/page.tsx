@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, Building2, FolderKanban, Plus, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, Building2, FolderKanban, Users } from "lucide-react";
 import { createWorkspaceAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
-import { CreateWorkspaceForm } from "@/components/create-workspace-form";
+import { CreateWorkspaceDialog } from "@/components/create-workspace-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canAccessAllWorkspaces, canCreateWorkspace } from "@/lib/role-rules";
 
 type WorkspaceCard = {
@@ -71,7 +70,10 @@ export default async function WorkspacesPage() {
               统一查看团队空间和项目范围。系统管理员可以跨工作区进入管理，普通用户只看到拥有项目权限的空间。
             </p>
           </div>
-          {canAccessAll ? <Badge className="border-primary/30 bg-primary/5 text-primary">全局后台视图</Badge> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {canAccessAll ? <Badge className="border-primary/30 bg-primary/5 text-primary">全局后台视图</Badge> : null}
+            {canCreate ? <CreateWorkspaceDialog action={createWorkspaceAction} /> : null}
+          </div>
         </div>
         <div className="grid gap-px bg-border md:grid-cols-4">
           <div className="bg-card p-4">
@@ -93,7 +95,7 @@ export default async function WorkspacesPage() {
         </div>
       </section>
 
-      <div className={canCreate ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
+      <div className="grid gap-6">
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -176,33 +178,6 @@ export default async function WorkspacesPage() {
             </div>
           )}
         </section>
-
-        {canCreate ? (
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  新建工作区
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">工作区用于隔离项目集合，项目权限在项目内配置。</p>
-              </CardHeader>
-              <CardContent>
-                <CreateWorkspaceForm action={createWorkspaceAction} />
-              </CardContent>
-            </Card>
-            <div className="rounded-lg border bg-card p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                管理规则
-              </div>
-              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                <p>只有系统管理员可以创建工作区。</p>
-                <p>普通用户通过项目角色获得工作区可见性。</p>
-              </div>
-            </div>
-          </aside>
-        ) : null}
       </div>
     </AppShell>
   );

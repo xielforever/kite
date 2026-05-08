@@ -41,6 +41,7 @@ const setupSchema = z.object({
   adminName: z.string().trim().min(1, "请输入管理员姓名"),
   adminEmail: z.string().email("请输入有效邮箱").transform((value) => value.toLowerCase()),
   adminPassword: z.string().min(8, "管理员密码至少 8 位"),
+  appUrl: z.string().trim().url("请输入有效访问地址"),
   workspaceName: z.string().trim().min(1, "请输入默认工作区名称"),
   workspaceSlug: z
     .string()
@@ -101,7 +102,10 @@ function parseDatabaseUrl(databaseUrl?: string | null) {
 }
 
 export function getSetupDefaults() {
-  return parseDatabaseUrl(process.env.DATABASE_URL);
+  return {
+    ...parseDatabaseUrl(process.env.DATABASE_URL),
+    appUrl: process.env.AUTH_URL || "",
+  };
 }
 
 function buildDatabaseUrl(input: DatabaseInput) {
@@ -135,6 +139,7 @@ function setupInputFromForm(formData: FormData) {
     adminName: String(formData.get("adminName") ?? ""),
     adminEmail: String(formData.get("adminEmail") ?? ""),
     adminPassword: String(formData.get("adminPassword") ?? ""),
+    appUrl: String(formData.get("appUrl") ?? ""),
     workspaceName: String(formData.get("workspaceName") ?? ""),
     workspaceSlug: String(formData.get("workspaceSlug") ?? ""),
   });
@@ -157,17 +162,19 @@ function upsertEnvValue(content: string, key: string, value: string) {
   return `${prefix}${prefix ? "\n" : ""}${line}\n`;
 }
 
-async function writeSetupEnv(databaseUrl: string) {
+async function writeSetupEnv(databaseUrl: string, appUrl: string) {
   const envPath = setupEnvPath();
   const authSecret = process.env.AUTH_SECRET || randomBytes(32).toString("hex");
   await mkdir(path.dirname(envPath), { recursive: true });
   let content = await readEnvFile(envPath);
   content = upsertEnvValue(content, "DATABASE_URL", databaseUrl);
   content = upsertEnvValue(content, "AUTH_SECRET", authSecret);
+  content = upsertEnvValue(content, "AUTH_URL", appUrl);
   content = upsertEnvValue(content, "KITE_SETUP_COMPLETE", "true");
   await writeFile(envPath, content, "utf8");
   process.env.DATABASE_URL = databaseUrl;
   process.env.AUTH_SECRET = authSecret;
+  process.env.AUTH_URL = appUrl;
   process.env.KITE_SETUP_COMPLETE = "true";
   return envPath;
 }
@@ -332,8 +339,16 @@ async function seedInitialData(input: SetupInput, databaseUrl: string) {
         },
       });
 
-      await tx.workspaceMember.create({
-        data: { workspaceId: workspace.id, userId: admin.id, role: "OWNER" },
+      await tx.project.create({
+        data: {
+          workspaceId: workspace.id,
+          name: "默认项目",
+          key: "DEMO",
+          description: "初始化创建的默认项目，可在项目页调整或归档。",
+          members: {
+            create: { userId: admin.id, role: "LEAD" },
+          },
+        },
       });
     });
   });
@@ -362,7 +377,7 @@ export async function initializeApp(_state: SetupActionState, formData: FormData
     });
     await runMigrations(databaseUrl);
     await seedInitialData(parsed.data, databaseUrl);
-    const envPath = await writeSetupEnv(databaseUrl);
+    const envPath = await writeSetupEnv(databaseUrl, parsed.data.appUrl);
     return { ok: true, restartHint: restartHint(envPath) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "初始化失败，请检查数据库连接和权限" };
@@ -414,7 +429,7 @@ export async function createSuperAdminAction(_state: SetupActionState, formData:
   try {
     const databaseUrl = buildDatabaseUrl(parsed.data);
     await seedInitialData(parsed.data, databaseUrl);
-    const envPath = await writeSetupEnv(databaseUrl);
+    const envPath = await writeSetupEnv(databaseUrl, parsed.data.appUrl);
     return { ok: true, restartHint: restartHint(envPath) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "创建 superAdmin 失败，请确认迁移已完成" };

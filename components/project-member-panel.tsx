@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { addProjectMemberAction, removeProjectMemberAction, updateProjectMemberRoleFormAction } from "@/lib/actions";
 import { projectRoleLabels, projectRoles, type ProjectRoleValue } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
@@ -6,6 +9,107 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+type Candidate = { id: string; name: string; email: string };
+
+function MemberEmailSearch({
+  workspaceSlug,
+  projectKey,
+  value,
+  onChange,
+}: {
+  workspaceSlug: string;
+  projectKey: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const query = value.trim();
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setCandidates([]);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `/api/w/${encodeURIComponent(workspaceSlug)}/projects/${encodeURIComponent(projectKey)}/member-candidates?q=${encodeURIComponent(query)}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) {
+          setCandidates([]);
+          return;
+        }
+        const data = (await response.json()) as { users?: Candidate[] };
+        setCandidates(data.users ?? []);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setCandidates([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [projectKey, query, workspaceSlug]);
+
+  const showSuggestions = open && query.length >= 2;
+
+  return (
+    <div className="relative space-y-2">
+      <Label htmlFor="project-member-email">成员邮箱</Label>
+      <Input
+        id="project-member-email"
+        name="email"
+        type="email"
+        value={value}
+        onChange={(event) => {
+          onChange(event.currentTarget.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        placeholder="输入姓名或邮箱搜索"
+        autoComplete="off"
+        required
+      />
+      {showSuggestions ? (
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-card p-1 shadow-md">
+          {loading ? <p className="px-2 py-2 text-xs text-muted-foreground">搜索中...</p> : null}
+          {!loading && candidates.length
+            ? candidates.map((candidate) => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  className="flex w-full flex-col rounded-sm px-2 py-2 text-left text-sm hover:bg-muted"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(candidate.email);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="font-medium">{candidate.name}</span>
+                  <span className="text-xs text-muted-foreground">{candidate.email}</span>
+                </button>
+              ))
+            : null}
+          {!loading && !candidates.length ? <p className="px-2 py-2 text-xs text-muted-foreground">没有匹配的未加入用户</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function ProjectMemberPanel({
   workspaceSlug,
@@ -19,6 +123,7 @@ export function ProjectMemberPanel({
   canManage: boolean;
 }) {
   const addProjectMember = addProjectMemberAction.bind(null, workspaceSlug, projectKey);
+  const [email, setEmail] = useState("");
 
   return (
     <div className="space-y-4">
@@ -64,11 +169,8 @@ export function ProjectMemberPanel({
         ))}
       </div>
       {canManage ? (
-        <ActionForm action={addProjectMember} submitLabel="添加项目成员">
-          <div className="space-y-2">
-            <Label htmlFor="project-member-email">成员邮箱</Label>
-            <Input id="project-member-email" name="email" type="email" placeholder="已注册用户邮箱" required />
-          </div>
+        <ActionForm action={addProjectMember} submitLabel="添加项目成员" onSuccess={() => setEmail("")}>
+          <MemberEmailSearch workspaceSlug={workspaceSlug} projectKey={projectKey} value={email} onChange={setEmail} />
           <div className="space-y-2">
             <Label htmlFor="project-member-role">项目角色</Label>
             <select id="project-member-role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">

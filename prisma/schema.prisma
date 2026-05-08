@@ -7,12 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum WorkspaceRole {
-  OWNER
-  ADMIN
-  MEMBER
-}
-
 enum SystemRole {
   SUPER_ADMIN
   USER
@@ -48,7 +42,6 @@ model User {
   mustChangePassword Boolean @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
-  memberships   WorkspaceMember[]
   projectMemberships ProjectMember[]
   ownedSpaces   Workspace[]       @relation("WorkspaceCreator")
   createdIssues Issue[]           @relation("IssueCreator")
@@ -69,41 +62,11 @@ model Workspace {
   description String?
   createdById String
   createdBy   User              @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members     WorkspaceMember[]
-  invitations WorkspaceInvitation[]
   projects    Project[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
   @@index([createdById])
-}
-
-model WorkspaceInvitation {
-  id          String        @id @default(cuid())
-  workspaceId String
-  email       String?
-  role        WorkspaceRole @default(MEMBER)
-  token       String        @unique
-  expiresAt   DateTime
-  acceptedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
-}
-
-model WorkspaceMember {
-  id          String        @id @default(cuid())
-  workspaceId String
-  userId      String
-  role        WorkspaceRole @default(MEMBER)
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@unique([workspaceId, userId])
-  @@index([userId])
 }
 
 model Project {
@@ -115,7 +78,6 @@ model Project {
   archived    Boolean   @default(false)
   nextIssueNumber Int    @default(1)
   defaultDueDays Int?
-  autoJoin    Boolean   @default(false)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members     ProjectMember[]
   issues      Issue[]

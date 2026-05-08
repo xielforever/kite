@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { randomBytes } from "node:crypto";
 import { compare, hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { signIn, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { IssueStatusValue, WorkspaceRoleValue } from "@/lib/constants";
-import { canTransitionIssueStatus, statusLabels } from "@/lib/constants";
+import type { IssuePriorityValue, IssueStatusValue } from "@/lib/constants";
+import { canTransitionIssueStatus, priorityLabels, statusLabels } from "@/lib/constants";
 import {
   ForbiddenError,
   requireProject,
@@ -17,9 +16,8 @@ import {
   requireProjectEditor,
   requireSystemAdmin,
   requireUser,
-  requireWorkspaceAdmin,
 } from "@/lib/permissions";
-import { canChangeRole, canCreateWorkspace } from "@/lib/role-rules";
+import { canCreateWorkspace } from "@/lib/role-rules";
 import { projectKey, slugifyAscii } from "@/lib/utils";
 import {
   adminResetPasswordSchema,
@@ -27,9 +25,8 @@ import {
   commentSchema,
   issueMoveSchema,
   issueSchema,
-  invitationSchema,
-  memberSchema,
   passwordSchema,
+  projectCreateSchema,
   projectMemberSchema,
   profileSchema,
   projectSchema,
@@ -78,6 +75,65 @@ async function validateIssueRelations(projectId: string, assigneeId?: string) {
     });
     if (!assignee) throw new ForbiddenError("负责人不属于该项目");
   }
+}
+
+function nullableValue(value?: string | null) {
+  return value?.trim() ? value.trim() : null;
+}
+
+function dateKey(value?: Date | string | null) {
+  if (!value) return null;
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function formatDateValue(value?: Date | string | null) {
+  return dateKey(value) ?? "未设置";
+}
+
+function formatTextValue(value?: string | null) {
+  return value?.trim() ? value.trim() : "未设置";
+}
+
+function descriptionChangeLabel(before?: string | null, after?: string | null) {
+  const beforeSet = Boolean(before?.trim());
+  const afterSet = Boolean(after?.trim());
+  if (!beforeSet && afterSet) return "描述：未设置 → 已填写";
+  if (beforeSet && !afterSet) return "描述：已清空";
+  return "描述：已更新";
+}
+
+function buildIssueChangeDetails({
+  issue,
+  next,
+  assigneeLabels,
+}: {
+  issue: {
+    title: string;
+    description: string | null;
+    priority: IssuePriorityValue;
+    assigneeId: string | null;
+    dueDate: Date | null;
+  };
+  next: {
+    title: string;
+    description: string | null;
+    priority: IssuePriorityValue;
+    assigneeId: string | null;
+    dueDate: Date | null;
+  };
+  assigneeLabels: Map<string, string>;
+}) {
+  const changes: string[] = [];
+  if (issue.title !== next.title) changes.push(`标题：${formatTextValue(issue.title)} → ${formatTextValue(next.title)}`);
+  if ((issue.description ?? "") !== (next.description ?? "")) changes.push(descriptionChangeLabel(issue.description, next.description));
+  if (issue.priority !== next.priority) changes.push(`优先级：${priorityLabels[issue.priority]} → ${priorityLabels[next.priority]}`);
+  if ((issue.assigneeId ?? "") !== (next.assigneeId ?? "")) {
+    const before = issue.assigneeId ? (assigneeLabels.get(issue.assigneeId) ?? issue.assigneeId) : "未分配";
+    const after = next.assigneeId ? (assigneeLabels.get(next.assigneeId) ?? next.assigneeId) : "未分配";
+    changes.push(`负责人：${before} → ${after}`);
+  }
+  if (dateKey(issue.dueDate) !== dateKey(next.dueDate)) changes.push(`截止日期：${formatDateValue(issue.dueDate)} → ${formatDateValue(next.dueDate)}`);
+  return changes;
 }
 
 async function uniqueWorkspaceSlug(base: string) {
@@ -166,18 +222,13 @@ export async function createWorkspaceAction(_state: ActionState, formData: FormD
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const workspace = await tx.workspace.create({
-        data: {
-          name: parsed.data.name,
-          slug: parsed.data.slug,
-          description: parsed.data.description || null,
-          createdById: user.id,
-        },
-      });
-      await tx.workspaceMember.create({
-        data: { workspaceId: workspace.id, userId: user.id, role: "OWNER" },
-      });
+    await prisma.workspace.create({
+      data: {
+        name: parsed.data.name,
+        slug: parsed.data.slug,
+        description: parsed.data.description || null,
+        createdById: user.id,
+      },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -218,250 +269,26 @@ export async function updateWorkspaceAction(workspaceSlug: string, _state: Actio
   return { ok: true };
 }
 
-export async function addMemberAction(workspaceSlug: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  const parsed = memberSchema.safeParse({
-    email: formValue(formData, "email").toLowerCase(),
-    role: formValue(formData, "role") || "MEMBER",
-  });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  if (!canChangeRole(membership.role, parsed.data.role)) {
-    return { error: "只有所有者可以添加管理员或所有者" };
-  }
-
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
-  if (!user) return { error: "该用户尚未注册" };
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.workspaceMember.create({
-        data: { workspaceId: workspace.id, userId: user.id, role: parsed.data.role },
-      });
-      if (parsed.data.role === "OWNER" || parsed.data.role === "ADMIN") {
-        const projects = await tx.project.findMany({
-          where: { workspaceId: workspace.id },
-          select: { id: true },
-        });
-        if (projects.length) {
-          for (const project of projects) {
-            await tx.projectMember.upsert({
-              where: { projectId_userId: { projectId: project.id, userId: user.id } },
-              update: { role: "LEAD" },
-              create: { projectId: project.id, userId: user.id, role: "LEAD" },
-            });
-          }
-        }
-      } else {
-        const autoJoinProjects = await tx.project.findMany({
-          where: { workspaceId: workspace.id, autoJoin: true, archived: false },
-          select: { id: true },
-        });
-        if (autoJoinProjects.length) {
-          for (const project of autoJoinProjects) {
-            await tx.projectMember.create({
-              data: { projectId: project.id, userId: user.id, role: "MEMBER" },
-            }).catch(() => {});
-          }
-        }
-      }
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "该用户已在工作区中" };
-    }
-    return actionError(error);
-  }
-  revalidatePath(`/w/${workspaceSlug}/settings/members`);
-  return { ok: true };
-}
-
-export async function createInvitationAction(workspaceSlug: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  const parsed = invitationSchema.safeParse({
-    email: formValue(formData, "email").toLowerCase(),
-    role: formValue(formData, "role") || "MEMBER",
-  });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
-  if (!canChangeRole(membership.role, parsed.data.role)) {
-    return { error: "只有所有者可以邀请管理员或所有者" };
-  }
-
-  await prisma.workspaceInvitation.create({
-    data: {
-      workspaceId: workspace.id,
-      email: parsed.data.email || null,
-      role: parsed.data.role,
-      token: randomBytes(24).toString("hex"),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
-  revalidatePath(`/w/${workspaceSlug}/settings/members`);
-  return { ok: true };
-}
-
-export async function revokeInvitationAction(workspaceSlug: string, invitationId: string) {
-  const { workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  await prisma.workspaceInvitation.deleteMany({ where: { id: invitationId, workspaceId: workspace.id, acceptedAt: null } });
-  revalidatePath(`/w/${workspaceSlug}/settings/members`);
-}
-
-export async function acceptInvitationAction(token: string) {
-  const user = await requireUser();
-  const invitation = await prisma.workspaceInvitation.findUnique({
-    where: { token },
-    include: { workspace: true },
-  });
-  if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) {
-    throw new ForbiddenError("邀请不存在或已过期");
-  }
-  if (invitation.email && invitation.email.toLowerCase() !== user.email?.toLowerCase()) {
-    throw new ForbiddenError("该邀请不属于当前登录账号");
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    const updateResult = await tx.workspaceInvitation.updateMany({
-      where: { id: invitation.id, acceptedAt: null },
-      data: { acceptedAt: new Date() },
-    });
-    if (updateResult.count === 0) throw new ForbiddenError("邀请已被使用");
-
-    const existing = await tx.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } },
-    });
-
-    if (existing) {
-      const roleOrder: Record<string, number> = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
-      if (roleOrder[invitation.role] > roleOrder[existing.role]) {
-        await tx.workspaceMember.update({
-          where: { id: existing.id },
-          data: { role: invitation.role },
-        });
-      }
-    } else {
-      await tx.workspaceMember.create({
-        data: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role },
-      });
-    }
-
-    if (invitation.role === "OWNER" || invitation.role === "ADMIN") {
-      const projects = await tx.project.findMany({
-        where: { workspaceId: invitation.workspaceId },
-        select: { id: true },
-      });
-      if (projects.length) {
-        for (const project of projects) {
-          await tx.projectMember.upsert({
-            where: { projectId_userId: { projectId: project.id, userId: user.id } },
-            update: { role: "LEAD" },
-            create: { projectId: project.id, userId: user.id, role: "LEAD" },
-          });
-        }
-      }
-    } else if (!existing) {
-      const autoJoinProjects = await tx.project.findMany({
-        where: { workspaceId: invitation.workspaceId, autoJoin: true, archived: false },
-        select: { id: true },
-      });
-      if (autoJoinProjects.length) {
-        for (const project of autoJoinProjects) {
-          await tx.projectMember.create({
-            data: { projectId: project.id, userId: user.id, role: "MEMBER" },
-          }).catch(() => {});
-        }
-      }
-    }
-
-    return invitation.workspace.slug;
-  });
-
-  redirect(`/w/${result}`);
-}
-
-export async function updateMemberRoleAction(workspaceSlug: string, memberId: string, role: WorkspaceRoleValue) {
-  const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  if (!canChangeRole(membership.role, role)) throw new ForbiddenError("只有所有者可以设置该角色");
-  const target = await prisma.workspaceMember.findFirst({ where: { id: memberId, workspaceId: workspace.id } });
-  if (!target) return;
-  if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
-    throw new ForbiddenError("只有所有者可以修改管理员或所有者的角色");
-  }
-  if (target.role === "OWNER" && role !== "OWNER") {
-    const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
-    if (ownerCount <= 1) throw new ForbiddenError("不能降级最后一个所有者");
-  }
-  await prisma.$transaction(async (tx) => {
-    await tx.workspaceMember.update({ where: { id: memberId }, data: { role } });
-    if (role === "OWNER" || role === "ADMIN") {
-      const projects = await tx.project.findMany({
-        where: { workspaceId: workspace.id },
-        select: { id: true },
-      });
-      if (projects.length) {
-        for (const project of projects) {
-          await tx.projectMember.upsert({
-            where: { projectId_userId: { projectId: project.id, userId: target.userId } },
-            update: { role: "LEAD" },
-            create: { projectId: project.id, userId: target.userId, role: "LEAD" },
-          });
-        }
-      }
-    } else {
-      const projects = await tx.project.findMany({
-        where: { workspaceId: workspace.id },
-        select: { id: true },
-      });
-      if (projects.length) {
-        for (const project of projects) {
-          const pm = await tx.projectMember.findUnique({
-            where: { projectId_userId: { projectId: project.id, userId: target.userId } },
-          });
-          if (pm && pm.role === "LEAD") {
-            await tx.projectMember.update({
-              where: { id: pm.id },
-              data: { role: "MEMBER" },
-            });
-          }
-        }
-      }
-    }
-  });
-  revalidatePath(`/w/${workspaceSlug}/settings/members`);
-}
-
-export async function removeMemberAction(workspaceSlug: string, memberId: string) {
-  const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  const target = await prisma.workspaceMember.findFirst({ where: { id: memberId, workspaceId: workspace.id } });
-  if (!target) return;
-  if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
-    throw new ForbiddenError("只有所有者可以移除管理员或所有者");
-  }
-  if (target.role === "OWNER") {
-    const ownerCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace.id, role: "OWNER" } });
-    if (ownerCount <= 1) throw new ForbiddenError("不能移除最后一个所有者");
-  }
-  await prisma.$transaction(async (tx) => {
-    await tx.projectMember.deleteMany({
-      where: { userId: target.userId, project: { workspaceId: workspace.id } },
-    });
-    await tx.workspaceMember.delete({ where: { id: memberId } });
-  });
-  revalidatePath(`/w/${workspaceSlug}/settings/members`);
-}
-
 export async function createProjectAction(workspaceSlug: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireSystemAdmin();
+  await requireSystemAdmin();
   const workspace = await prisma.workspace.findUnique({ where: { slug: workspaceSlug } });
   if (!workspace) return { error: "工作区不存在" };
-  const parsed = projectSchema.safeParse({
+  const parsed = projectCreateSchema.safeParse({
     name: formValue(formData, "name"),
     key: formValue(formData, "key") || projectKey(formValue(formData, "name")),
     description: formValue(formData, "description"),
     defaultDueDays: formValue(formData, "defaultDueDays"),
-    autoJoin: formData.get("autoJoin") === "on" ? "on" : undefined,
+    leadEmail: formValue(formData, "leadEmail").toLowerCase(),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
+    const lead = await prisma.user.findUnique({
+      where: { email: parsed.data.leadEmail },
+      select: { id: true },
+    });
+    if (!lead) return { error: "项目负责人尚未注册" };
+
     await prisma.project.create({
       data: {
         workspaceId: workspace.id,
@@ -469,9 +296,8 @@ export async function createProjectAction(workspaceSlug: string, _state: ActionS
         key: parsed.data.key,
         description: parsed.data.description || null,
         defaultDueDays: parsed.data.defaultDueDays ? Number(parsed.data.defaultDueDays) : null,
-        autoJoin: parsed.data.autoJoin === "on",
         members: {
-          create: { userId: user.id, role: "LEAD" },
+          create: { userId: lead.id, role: "LEAD" },
         },
       },
     });
@@ -512,7 +338,6 @@ export async function updateProjectAction(workspaceSlug: string, projectId: stri
     key: project.key,
     description: formValue(formData, "description"),
     defaultDueDays: formValue(formData, "defaultDueDays"),
-    autoJoin: formData.get("autoJoin") === "on" ? "on" : undefined,
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
@@ -523,7 +348,6 @@ export async function updateProjectAction(workspaceSlug: string, projectId: stri
         name: parsed.data.name,
         description: parsed.data.description || null,
         defaultDueDays: parsed.data.defaultDueDays ? Number(parsed.data.defaultDueDays) : null,
-        autoJoin: parsed.data.autoJoin === "on",
       },
     });
   } catch (error) {
@@ -595,10 +419,9 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
 
 export async function updateIssueAction(workspaceSlug: string, projectKeyValue: string, issueId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
   const { user, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
-  const parsed = issueSchema.safeParse({
+  const parsed = issueSchema.omit({ status: true }).safeParse({
     title: formValue(formData, "title"),
     description: formValue(formData, "description"),
-    status: formValue(formData, "status"),
     priority: formValue(formData, "priority"),
     assigneeId: formValue(formData, "assigneeId"),
     dueDate: formValue(formData, "dueDate"),
@@ -614,20 +437,37 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
   const issue = await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } });
   if (!issue) return { error: "任务不存在" };
 
+  const nextIssue = {
+    title: parsed.data.title,
+    description: nullableValue(parsed.data.description),
+    priority: parsed.data.priority,
+    assigneeId: nullableValue(parsed.data.assigneeId),
+    dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+  };
+  const assigneeIds = Array.from(new Set([issue.assigneeId, nextIssue.assigneeId].filter(Boolean))) as string[];
+  const assignees = assigneeIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: assigneeIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
+  const assigneeLabels = new Map(assignees.map((assignee) => [assignee.id, assignee.name || assignee.email]));
+  const changes = buildIssueChangeDetails({ issue, next: nextIssue, assigneeLabels });
+  if (!changes.length) return { ok: true };
+
   await prisma.$transaction([
     prisma.issue.update({
       where: { id: issueId },
       data: {
-        title: parsed.data.title,
-        description: parsed.data.description || null,
-        status: parsed.data.status,
-        priority: parsed.data.priority,
-        assigneeId: parsed.data.assigneeId || null,
-        dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+        title: nextIssue.title,
+        description: nextIssue.description,
+        priority: nextIssue.priority,
+        assigneeId: nextIssue.assigneeId,
+        dueDate: nextIssue.dueDate,
       },
     }),
     prisma.issueActivity.create({
-      data: { issueId, actorId: user.id, action: "更新任务", detail: parsed.data.title },
+      data: { issueId, actorId: user.id, action: "更新任务字段", detail: changes.join("\n") },
     }),
   ]);
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
@@ -805,8 +645,14 @@ export async function updateProjectMemberRoleAction(workspaceSlug: string, proje
   const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
   const parsed = projectMemberSchema.pick({ role: true }).safeParse({ role });
   if (!parsed.success) throw new ForbiddenError(parsed.error.errors[0]?.message);
+  const target = await prisma.projectMember.findUnique({ where: { id: projectMemberId } });
+  if (!target || target.projectId !== project.id) return;
+  if (target.role === "LEAD" && parsed.data.role !== "LEAD") {
+    const leadCount = await prisma.projectMember.count({ where: { projectId: project.id, role: "LEAD" } });
+    if (leadCount <= 1) throw new ForbiddenError("不能移除最后一个项目负责人");
+  }
   await prisma.projectMember.update({
-    where: { id: projectMemberId, projectId: project.id },
+    where: { id: projectMemberId },
     data: { role: parsed.data.role },
   });
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);

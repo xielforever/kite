@@ -1,8 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Plus } from "lucide-react";
 import { FormError } from "@/components/form-error";
 import { SubmitButton } from "@/components/submit-button";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,5 +72,25 @@ export function CreateWorkspaceForm({ action }: { action: CreateWorkspaceAction 
       <FormError message={state.error} />
       <SubmitButton pendingText="创建中...">创建工作区</SubmitButton>
     </form>
+  );
+}
+
+export function CreateWorkspaceDialog({ action }: { action: CreateWorkspaceAction }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button onClick={() => setOpen(true)} size="sm">
+        <Plus className="h-4 w-4" />
+        新建工作区
+      </Button>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>新建工作区</DialogTitle>
+          <DialogDescription>工作区只承载项目集合，访问权限在项目成员中配置。</DialogDescription>
+        </DialogHeader>
+        <CreateWorkspaceForm action={action} />
+      </DialogContent>
+    </Dialog>
   );
 }

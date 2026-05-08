@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, CalendarClock, KanbanSquare, LayoutList, ListTodo, UserPlus } from "lucide-react";
+import { Archive, CalendarClock, KanbanSquare, LayoutList, ListTodo } from "lucide-react";
 import { archiveProjectAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
@@ -147,10 +147,6 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                             <span className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1">
                               <CalendarClock className="h-3.5 w-3.5" />
                               默认截止：{project.defaultDueDays ? `${project.defaultDueDays} 天` : "未设置"}
-                            </span>
-                            <span className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1">
-                              <UserPlus className="h-3.5 w-3.5" />
-                              自动加入：{project.autoJoin ? "开启" : "关闭"}
                             </span>
                           </div>
                         </div>

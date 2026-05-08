@@ -13,8 +13,6 @@ async function main() {
     prisma.issue.deleteMany(),
     prisma.projectMember.deleteMany(),
     prisma.project.deleteMany(),
-    prisma.workspaceInvitation.deleteMany(),
-    prisma.workspaceMember.deleteMany(),
     prisma.workspace.deleteMany(),
     prisma.user.deleteMany(),
   ]);
@@ -36,11 +34,15 @@ async function main() {
       createdById: admin.id,
     },
   });
-  await prisma.workspaceMember.create({
+  await prisma.project.create({
     data: {
       workspaceId: workspace.id,
-      userId: admin.id,
-      role: "OWNER",
+      key: "DEMO",
+      name: "默认项目",
+      description: "用于开发测试的默认项目。",
+      members: {
+        create: { userId: admin.id, role: "LEAD" },
+      },
     },
   });
 

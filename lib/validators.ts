@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { issuePriorities, issueStatuses, projectRoles, systemRoles, workspaceRoles } from "@/lib/constants";
+import { issuePriorities, issueStatuses, projectRoles, systemRoles } from "@/lib/constants";
 
 export const registerSchema = z.object({
   name: z.string().trim().min(1, "请输入姓名").max(80, "姓名过长"),
@@ -35,16 +35,6 @@ export const workspaceSchema = z.object({
 
 export const workspaceUpdateSchema = workspaceSchema;
 
-export const memberSchema = z.object({
-  email: z.string().trim().email("邮箱格式不正确"),
-  role: z.enum(workspaceRoles),
-});
-
-export const invitationSchema = z.object({
-  email: z.string().trim().email("邮箱格式不正确").optional().or(z.literal("")),
-  role: z.enum(workspaceRoles),
-});
-
 export const projectSchema = z.object({
   name: z.string().trim().min(1, "请输入项目名称").max(100),
   key: z
@@ -55,7 +45,10 @@ export const projectSchema = z.object({
     .regex(/^[A-Z0-9]+$/, "项目 key 只能包含大写字母和数字"),
   description: z.string().trim().max(600).optional().or(z.literal("")),
   defaultDueDays: z.coerce.number().int().min(1).max(365).optional().or(z.literal("")),
-  autoJoin: z.enum(["on"]).optional(),
+});
+
+export const projectCreateSchema = projectSchema.extend({
+  leadEmail: z.string().trim().email("项目负责人邮箱格式不正确"),
 });
 
 export const projectMemberSchema = z.object({

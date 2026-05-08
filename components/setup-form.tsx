@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle, Database, KeyRound, ServerCog, UserRound } from "lucide-react";
+import { CheckCircle2, Circle, Database, Globe2, KeyRound, ServerCog, UserRound } from "lucide-react";
 import { FormError } from "@/components/form-error";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ type AdminFields = {
   adminName: string;
   adminEmail: string;
   adminPassword: string;
+  appUrl: string;
   workspaceName: string;
   workspaceSlug: string;
 };
@@ -69,7 +70,7 @@ export function SetupForm({
   validateAction: SetupAction;
   migrateAction: SetupAction;
   createAdminAction: SetupAction;
-  defaultValues?: DbFields;
+  defaultValues?: DbFields & { appUrl?: string };
 }) {
   const [step, setStep] = useState(1);
   const [db, setDb] = useState<DbFields>({
@@ -83,6 +84,7 @@ export function SetupForm({
     adminName: "Super Admin",
     adminEmail: "admin@example.com",
     adminPassword: "",
+    appUrl: defaultValues?.appUrl || "",
     workspaceName: "默认工作区",
     workspaceSlug: "default",
   });
@@ -98,6 +100,13 @@ export function SetupForm({
   useEffect(() => {
     if (migrateState.ok) setStep((current) => Math.max(current, 3));
   }, [migrateState.ok]);
+
+  useEffect(() => {
+    setAdmin((current) => {
+      if (current.appUrl || typeof window === "undefined") return current;
+      return { ...current, appUrl: window.location.origin };
+    });
+  }, []);
 
   const canMigrate = Boolean(validateState.ok);
   const canCreateAdmin = Boolean(migrateState.ok);
@@ -201,6 +210,23 @@ export function SetupForm({
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="adminPassword">初始密码</Label>
             <Input id="adminPassword" name="adminPassword" type="password" minLength={8} value={admin.adminPassword} onChange={(event) => setAdmin({ ...admin, adminPassword: event.target.value })} required />
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="appUrl" className="flex items-center gap-2">
+              <Globe2 className="h-4 w-4" />
+              访问地址
+            </Label>
+            <Input
+              id="appUrl"
+              name="appUrl"
+              type="url"
+              value={admin.appUrl}
+              onChange={(event) => setAdmin({ ...admin, appUrl: event.target.value })}
+              placeholder="例如：http://192.168.1.10:3000"
+              required
+            />
+            <p className="text-xs text-muted-foreground">会写入 AUTH_URL，远程访问时不要使用访问者本机的 localhost。</p>
           </div>
 
           <div className="space-y-2">

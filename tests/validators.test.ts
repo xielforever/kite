@@ -5,8 +5,7 @@ import {
   profileSchema,
   passwordSchema,
   workspaceSchema,
-  memberSchema,
-  invitationSchema,
+  projectCreateSchema,
   projectSchema,
   projectMemberSchema,
   issueSchema,
@@ -71,24 +70,6 @@ describe("workspaceSchema", () => {
   });
 });
 
-describe("memberSchema", () => {
-  it("accepts valid member", () => {
-    expect(memberSchema.safeParse({ email: "user@example.com", role: "MEMBER" }).success).toBe(true);
-  });
-  it("rejects invalid role", () => {
-    expect(memberSchema.safeParse({ email: "user@example.com", role: "KING" }).success).toBe(false);
-  });
-});
-
-describe("invitationSchema", () => {
-  it("accepts invitation without email", () => {
-    expect(invitationSchema.safeParse({ email: "", role: "MEMBER" }).success).toBe(true);
-  });
-  it("accepts invitation with email", () => {
-    expect(invitationSchema.safeParse({ email: "user@example.com", role: "ADMIN" }).success).toBe(true);
-  });
-});
-
 describe("projectSchema", () => {
   it("accepts valid project", () => {
     expect(projectSchema.safeParse({ name: "平台改造", key: "PLAT", description: "" }).success).toBe(true);
@@ -98,6 +79,13 @@ describe("projectSchema", () => {
   });
   it("rejects short key", () => {
     expect(projectSchema.safeParse({ name: "项目", key: "P", description: "" }).success).toBe(false);
+  });
+});
+
+describe("projectCreateSchema", () => {
+  it("requires a valid project lead email", () => {
+    expect(projectCreateSchema.safeParse({ name: "平台改造", key: "PLAT", description: "", leadEmail: "lead@example.com" }).success).toBe(true);
+    expect(projectCreateSchema.safeParse({ name: "平台改造", key: "PLAT", description: "", leadEmail: "" }).success).toBe(false);
   });
 });
 

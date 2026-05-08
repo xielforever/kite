@@ -30,8 +30,6 @@ async function main() {
     prisma.issue.deleteMany(),
     prisma.projectMember.deleteMany(),
     prisma.project.deleteMany(),
-    prisma.workspaceInvitation.deleteMany(),
-    prisma.workspaceMember.deleteMany(),
     prisma.workspace.deleteMany(),
     prisma.user.deleteMany(),
   ]);
