@@ -196,10 +196,12 @@ async function countMigrationFiles() {
 }
 
 async function tableExists(prisma: PrismaClient, tableName: string) {
-  const rows = await prisma.$queryRawUnsafe<Array<{ exists: string | null }>>(
-    `SELECT to_regclass('public."${tableName.replace(/"/g, '""')}"') AS exists`,
-  );
-  return Boolean(rows[0]?.exists);
+  const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = ${tableName}
+  `;
+  return Number(rows[0]?.count ?? 0) > 0;
 }
 
 async function verifySchemaWriteAccess(prisma: PrismaClient) {
