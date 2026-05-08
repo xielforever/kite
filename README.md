@@ -161,3 +161,39 @@ sudo systemctl start kite
 ## 功能边界
 
 首版不包含附件、实时协作、Cycles、Modules、Pages、Analytics、AI 或计费。任务生命周期状态固定为 `待处理`、`进行中`、`待评审`、`已完成`、`已关闭`。
+
+## 页面初始化与 systemd
+
+首次启动时可以先不手工执行迁移和 seed。应用会在未初始化时引导到 `/setup`：
+
+1. 填写 PostgreSQL `DATABASE_URL`。
+2. 创建初始 `SUPER_ADMIN`。
+3. 执行 `prisma migrate deploy`。
+4. 写入环境文件并创建默认工作区。
+5. 重启服务后进入登录页。
+
+systemd 部署时建议使用 `/etc/kite/kite.env` 作为环境文件，初始化页会根据 `KITE_ENV_FILE` 写入该文件。
+
+仓库提供了可直接安装的服务模板和脚本：
+
+```bash
+sudo bash scripts/install-systemd.sh
+```
+
+默认安装到：
+
+- 应用目录：`/opt/kite`
+- 环境文件：`/etc/kite/kite.env`
+- 服务名：`kite`
+
+可通过环境变量覆盖：
+
+```bash
+sudo APP_DIR=/srv/kite ENV_DIR=/etc/kite SERVICE_NAME=kite bash scripts/install-systemd.sh
+```
+
+初始化完成后重启：
+
+```bash
+sudo bash scripts/restart-kite.sh
+```

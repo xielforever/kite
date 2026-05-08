@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { loginAction } from "@/lib/actions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSetupStatus } from "@/lib/setup";
 import { ActionForm } from "@/components/action-form";
 import { KiteLogo } from "@/components/kite-logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,9 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string; reason?: string }>;
 }) {
   const params = await searchParams;
+  const setup = await getSetupStatus();
+  if (!setup.initialized) redirect("/setup");
+
   const session = await auth();
   if (params.reason !== "expired" && session?.user?.id) {
     const user = await prisma.user.findUnique({

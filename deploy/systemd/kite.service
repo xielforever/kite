@@ -1,0 +1,26 @@
+[Unit]
+Description=Kite project management service
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kite
+Group=kite
+WorkingDirectory=/opt/kite
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=0.0.0.0
+Environment=KITE_ENV_FILE=/etc/kite/kite.env
+Environment=KITE_SYSTEMD_SERVICE=kite
+EnvironmentFile=-/etc/kite/kite.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/kite /etc/kite
+
+[Install]
+WantedBy=multi-user.target

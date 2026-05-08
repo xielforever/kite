@@ -27,7 +27,7 @@ function redirectToLogin(req: Parameters<Parameters<typeof auth>[0]>[0]) {
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
+  const isPublic = pathname === "/" || pathname === "/setup" || publicRoutes.some((route) => pathname.startsWith(route));
   const hasValidSession = Boolean(req.auth?.user?.id);
 
   if (!hasValidSession && !isPublic) {
