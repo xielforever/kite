@@ -68,13 +68,12 @@ function actionError(error: unknown): ActionState {
   return { error: "操作失败，请稍后重试" };
 }
 
-async function validateIssueRelations(projectId: string, workspaceId: string, assigneeId?: string) {
+async function validateIssueRelations(projectId: string, assigneeId?: string) {
   if (assigneeId) {
     const assignee = await prisma.projectMember.findFirst({
       where: {
         projectId,
         userId: assigneeId,
-        user: { memberships: { some: { workspaceId } } },
       },
     });
     if (!assignee) throw new ForbiddenError("负责人不属于该项目");
@@ -536,7 +535,7 @@ export async function updateProjectAction(workspaceSlug: string, projectId: stri
 }
 
 export async function createIssueAction(workspaceSlug: string, projectKeyValue: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { user, workspace, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
+  const { user, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
   const parsed = issueSchema.safeParse({
     title: formValue(formData, "title"),
     description: formValue(formData, "description"),
@@ -548,7 +547,7 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
-    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId);
+    await validateIssueRelations(project.id, parsed.data.assigneeId);
   } catch (error) {
     return actionError(error);
   }
@@ -595,7 +594,7 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
 }
 
 export async function updateIssueAction(workspaceSlug: string, projectKeyValue: string, issueId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { user, workspace, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
+  const { user, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
   const parsed = issueSchema.safeParse({
     title: formValue(formData, "title"),
     description: formValue(formData, "description"),
@@ -607,7 +606,7 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
   try {
-    await validateIssueRelations(project.id, workspace.id, parsed.data.assigneeId);
+    await validateIssueRelations(project.id, parsed.data.assigneeId);
   } catch (error) {
     return actionError(error);
   }
