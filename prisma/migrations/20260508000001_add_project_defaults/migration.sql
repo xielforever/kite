@@ -1,0 +1,2 @@
+ALTER TABLE "Project" ADD COLUMN "defaultDueDays" INTEGER;
+ALTER TABLE "Project" ADD COLUMN "autoJoin" BOOLEAN NOT NULL DEFAULT false;

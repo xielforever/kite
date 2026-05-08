@@ -78,7 +78,10 @@ npm run build
 ```bash
 npm run reset-db
 npm run seed:demo
+npm run clear-db
 ```
+
+`clear-db` 只清空业务数据，保留表结构和 `_prisma_migrations`，适合重新测试 `/setup` 初始化流程。
 
 `reset-db` 会清空业务数据并创建默认管理员，仅适合本地开发或可丢弃环境。`seed:demo` 用于写入演示数据。
 
@@ -176,6 +179,7 @@ npm run lint             # ESLint
 npm run test             # Vitest
 npm run prisma:deploy    # 执行生产迁移
 npm run prisma:migrate   # 本地开发迁移
+npm run clear-db         # 清空业务数据，保留迁移记录
 npm run reset-db         # 清空并写入本地默认管理员
 npm run seed:demo        # 写入演示数据
 ```

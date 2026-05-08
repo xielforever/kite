@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "seed": "tsx scripts/seed.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
+    "clear-db": "tsx scripts/clear-db.ts",
     "reset-db": "tsx scripts/reset-db.ts",
     "smoke": "tsx scripts/smoke.ts",
     "e2e": "playwright test",
