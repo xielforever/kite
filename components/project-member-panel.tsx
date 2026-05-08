@@ -1,4 +1,4 @@
-import { addProjectMemberAction, removeProjectMemberAction, updateProjectMemberRoleAction } from "@/lib/actions";
+import { addProjectMemberAction, removeProjectMemberAction, updateProjectMemberRoleFormAction } from "@/lib/actions";
 import { projectRoleLabels, projectRoles, type ProjectRoleValue } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
@@ -15,7 +15,7 @@ export function ProjectMemberPanel({
 }: {
   workspaceSlug: string;
   projectKey: string;
-  members: { id: string; role: ProjectRoleValue; user: { name: string; email: string } }[];
+  members: { id: string; role: ProjectRoleValue; user: { id: string; name: string; email: string } }[];
   canManage: boolean;
 }) {
   const addProjectMember = addProjectMemberAction.bind(null, workspaceSlug, projectKey);
@@ -32,10 +32,7 @@ export function ProjectMemberPanel({
               </div>
               {canManage ? (
                 <form
-                  action={async (formData) => {
-                    "use server";
-                    await updateProjectMemberRoleAction(workspaceSlug, projectKey, member.id, String(formData.get("role") ?? ""));
-                  }}
+                  action={updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id)}
                   className="flex items-center gap-2"
                 >
                   <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的项目角色`}>
@@ -55,10 +52,7 @@ export function ProjectMemberPanel({
             </div>
             {canManage ? (
               <form
-                action={async () => {
-                  "use server";
-                  await removeProjectMemberAction(workspaceSlug, projectKey, member.id);
-                }}
+                action={removeProjectMemberAction.bind(null, workspaceSlug, projectKey, member.id)}
                 className="mt-3"
               >
                 <ConfirmSubmitButton size="sm" variant="ghost" message="确定移除该项目成员？">
@@ -72,8 +66,8 @@ export function ProjectMemberPanel({
       {canManage ? (
         <ActionForm action={addProjectMember} submitLabel="添加项目成员">
           <div className="space-y-2">
-            <Label htmlFor="project-member-email">工作区成员邮箱</Label>
-            <Input id="project-member-email" name="email" type="email" required />
+            <Label htmlFor="project-member-email">成员邮箱</Label>
+            <Input id="project-member-email" name="email" type="email" placeholder="已注册用户邮箱" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="project-member-role">项目角色</Label>

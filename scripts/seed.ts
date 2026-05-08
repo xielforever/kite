@@ -7,14 +7,14 @@ async function main() {
   const passwordHash = await hash("plane", 12);
   const user = await prisma.user.upsert({
     where: { email: "demo@example.com" },
-    update: { name: "Demo User", passwordHash, systemRole: "SUPER_ADMIN", mustChangePassword: false },
-    create: { email: "demo@example.com", name: "Demo User", passwordHash, systemRole: "SUPER_ADMIN", mustChangePassword: false },
+    update: { name: "张无忌", passwordHash, systemRole: "SUPER_ADMIN", mustChangePassword: false },
+    create: { email: "demo@example.com", name: "张无忌", passwordHash, systemRole: "SUPER_ADMIN", mustChangePassword: false },
   });
 
   const workspace = await prisma.workspace.upsert({
     where: { slug: "demo" },
-    update: { name: "Demo 工作区" },
-    create: { name: "Demo 工作区", slug: "demo", createdById: user.id },
+    update: { name: "光明顶工作区" },
+    create: { name: "光明顶工作区", slug: "demo", createdById: user.id },
   });
 
   await prisma.workspaceMember.upsert({
@@ -25,12 +25,12 @@ async function main() {
 
   const project = await prisma.project.upsert({
     where: { workspaceId_key: { workspaceId: workspace.id, key: "DEMO" } },
-    update: { name: "Demo 项目", description: "用于快速体验 Kite", archived: false },
+    update: { name: "明教总坛", description: "用于快速体验 Kite 的任务流转、看板和成员协作。", archived: false },
     create: {
       workspaceId: workspace.id,
       key: "DEMO",
-      name: "Demo 项目",
-      description: "用于快速体验 Kite",
+      name: "明教总坛",
+      description: "用于快速体验 Kite 的任务流转、看板和成员协作。",
       nextIssueNumber: 4,
     },
   });
@@ -42,11 +42,11 @@ async function main() {
   });
 
   for (const issue of [
-    { number: 1, title: "完善任务列表", status: "TODO" as const },
-    { number: 2, title: "优化看板拖拽", status: "IN_PROGRESS" as const },
-    { number: 3, title: "发布内部试用", status: "DONE" as const },
+    { number: 1, title: "整理光明顶议事清单", status: "TODO" as const },
+    { number: 2, title: "确认六大门派来访安排", status: "IN_PROGRESS" as const },
+    { number: 3, title: "发布总坛值守轮班表", status: "REVIEW" as const },
   ]) {
-    await prisma.issue.upsert({
+    const savedIssue = await prisma.issue.upsert({
       where: { projectId_number: { projectId: project.id, number: issue.number } },
       update: { title: issue.title, status: issue.status },
       create: {
@@ -60,9 +60,34 @@ async function main() {
         sortOrder: issue.number * 1000,
       },
     });
+
+    await prisma.issueActivity.deleteMany({ where: { issueId: savedIssue.id } });
+    const createdAt = new Date();
+    createdAt.setDate(createdAt.getDate() - issue.number);
+    createdAt.setHours(9, 0, 0, 0);
+    const activities = [
+      { action: "创建任务", detail: `DEMO-${issue.number}`, createdAt },
+    ];
+    if (issue.status === "IN_PROGRESS" || issue.status === "REVIEW") {
+      const startedAt = new Date(createdAt);
+      startedAt.setMinutes(12, 7, 0);
+      activities.push({ action: "移动任务", detail: "进行中", createdAt: startedAt });
+    }
+    if (issue.status === "REVIEW") {
+      const reviewedAt = new Date(createdAt);
+      reviewedAt.setMinutes(24, 14, 0);
+      activities.push({ action: "提交评审", detail: "待评审", createdAt: reviewedAt });
+    }
+    await prisma.issueActivity.createMany({
+      data: activities.map((activity) => ({
+        issueId: savedIssue.id,
+        actorId: user.id,
+        ...activity,
+      })),
+    });
   }
 
-  console.log("Seed complete: demo@example.com / plane");
+  console.log("Seed complete: demo@example.com / plane (张无忌)");
 }
 
 main()

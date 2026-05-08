@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { Archive, BarChart3, CheckCircle2, KanbanSquare, LayoutList, ListTodo, Plus } from "lucide-react";
+import { Archive, CalendarClock, KanbanSquare, LayoutList, ListTodo, UserPlus } from "lucide-react";
 import { archiveProjectAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
-import { canManageProject, canManageWorkspace } from "@/lib/role-rules";
+import { canAccessAllWorkspaces, canManageProject } from "@/lib/role-rules";
 import { AppShell } from "@/components/app-shell";
-import { ProjectEditForm } from "@/components/project-edit-form";
-import { ProjectForm } from "@/components/project-form";
+import { CreateProjectDialog, ProjectSettingsDialog } from "@/components/project-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { projectRoleLabels, userPublicFields } from "@/lib/constants";
 
@@ -24,13 +22,13 @@ function percent(done: number, total: number) {
 
 export default async function ProjectsPage({ params }: { params: Promise<{ workspaceSlug: string }> }) {
   const { workspaceSlug } = await params;
-  const { user, workspace, membership } = await requireWorkspace(workspaceSlug);
-  const isWorkspaceAdmin = canManageWorkspace(membership.role);
+  const { user, workspace } = await requireWorkspace(workspaceSlug);
+  const isSystemAdmin = canAccessAllWorkspaces(user.systemRole);
   const projects = await prisma.project.findMany({
     where: {
       workspaceId: workspace.id,
       archived: false,
-      ...(isWorkspaceAdmin ? {} : { members: { some: { userId: user.id } } }),
+      ...(isSystemAdmin ? {} : { members: { some: { userId: user.id } } }),
     },
     include: {
       _count: {
@@ -45,7 +43,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
     },
     orderBy: { createdAt: "desc" },
   });
-  const canCreateProject = isWorkspaceAdmin;
+  const canCreateProject = isSystemAdmin;
   const projectIds = projects.map((p) => p.id);
   const issueCounts = projectIds.length
     ? Object.fromEntries(
@@ -57,13 +55,14 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
       )
     : ({} as Record<string, number>);
   const totalIssues = projects.reduce((sum, p) => sum + (p._count.issues ?? 0), 0);
+  const reviewIssues = projects.reduce((sum, p) => sum + (issueCounts[`${p.id}:REVIEW`] ?? 0), 0);
   const doneIssues = projects.reduce((sum, p) => sum + (issueCounts[`${p.id}:DONE`] ?? 0), 0);
-  const openIssues = totalIssues - doneIssues;
+  const closedIssues = projects.reduce((sum, p) => sum + (issueCounts[`${p.id}:CLOSED`] ?? 0), 0);
+  const openIssues = totalIssues - doneIssues - closedIssues;
   const uniqueMembers = new Set(projects.flatMap((project) => project.members.map((member) => member.userId))).size;
-  const completionRate = percent(doneIssues, totalIssues);
 
   return (
-    <AppShell title="项目" subtitle={`${workspace.name} · ${isWorkspaceAdmin ? "工作区管理视图" : "项目成员视图"}`} workspaceSlug={workspaceSlug}>
+    <AppShell title="项目" subtitle={`${workspace.name} · ${isSystemAdmin ? "系统管理视图" : "项目成员视图"}`} workspaceSlug={workspaceSlug}>
       <section className="mb-6 rounded-lg border bg-card">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -75,12 +74,15 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
               用于快速判断项目规模、任务完成度和负责人范围。进入看板处理流转，进入列表做筛选和批量浏览。
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/w/${workspaceSlug}/projects/archived`}>
-              <Archive className="h-4 w-4" />
-              归档项目
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/w/${workspaceSlug}/projects/archived`}>
+                <Archive className="h-4 w-4" />
+                归档项目
+              </Link>
+            </Button>
+            {canCreateProject ? <CreateProjectDialog workspaceSlug={workspaceSlug} /> : null}
+          </div>
         </div>
         <div className="grid gap-px bg-border md:grid-cols-4">
           <div className="bg-card p-4">
@@ -88,7 +90,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             <p className="mt-1 text-2xl font-semibold">{projects.length}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">未完成任务</p>
+            <p className="text-xs text-muted-foreground">流转中任务</p>
             <p className="mt-1 text-2xl font-semibold">{openIssues}</p>
           </div>
           <div className="bg-card p-4">
@@ -96,13 +98,13 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             <p className="mt-1 text-2xl font-semibold">{uniqueMembers}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">整体完成率</p>
-            <p className="mt-1 text-2xl font-semibold">{completionRate}%</p>
+            <p className="text-xs text-muted-foreground">待评审 / 已关闭</p>
+            <p className="mt-1 text-2xl font-semibold">{reviewIssues} / {closedIssues}</p>
           </div>
         </div>
       </section>
 
-      <div className={canCreateProject ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
+      <div className="grid gap-6">
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -114,14 +116,16 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
           {projects.length ? (
             projects.map((project) => {
               const projectMembership = project.members.find((member) => member.userId === user.id);
-              const canManage = isWorkspaceAdmin || canManageProject(projectMembership?.role);
+              const canManage = isSystemAdmin || canManageProject(projectMembership?.role);
               const todoCount = issueCounts[`${project.id}:TODO`] ?? 0;
               const inProgressCount = issueCounts[`${project.id}:IN_PROGRESS`] ?? 0;
+              const reviewCount = issueCounts[`${project.id}:REVIEW`] ?? 0;
               const doneCount = issueCounts[`${project.id}:DONE`] ?? 0;
+              const closedCount = issueCounts[`${project.id}:CLOSED`] ?? 0;
               const projectTotal = project._count.issues ?? 0;
               const projectCompletion = percent(doneCount, projectTotal);
               const visibleMembers = project.members.slice(0, 4);
-              const roleText = isWorkspaceAdmin ? "工作区管理" : projectMembership?.role ? projectRoleLabels[projectMembership.role] : "未加入";
+              const roleText = isSystemAdmin ? "系统管理" : projectMembership?.role ? projectRoleLabels[projectMembership.role] : "未加入";
 
               return (
                 <article key={project.id} className="rounded-lg border bg-card p-4 shadow-sm transition hover:border-primary/50 hover:shadow-md">
@@ -134,10 +138,21 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="truncate text-base font-semibold">{project.name}</h3>
+                            <Badge className="border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">活跃</Badge>
                             <Badge>{roleText}</Badge>
                             {canManage ? <Badge className="border-primary/30 bg-primary/5 text-primary">可管理</Badge> : null}
                           </div>
                           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{project.description || "暂无描述"}</p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1">
+                              <CalendarClock className="h-3.5 w-3.5" />
+                              默认截止：{project.defaultDueDays ? `${project.defaultDueDays} 天` : "未设置"}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1">
+                              <UserPlus className="h-3.5 w-3.5" />
+                              自动加入：{project.autoJoin ? "开启" : "关闭"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -154,6 +169,9 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                             列表
                           </Link>
                         </Button>
+                        {canManage ? (
+                          <ProjectSettingsDialog workspaceSlug={workspaceSlug} project={project} />
+                        ) : null}
                         {canManage ? (
                           <form
                             action={async () => {
@@ -179,7 +197,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                         <div className="h-2 overflow-hidden rounded-full bg-muted">
                           <div className="h-full rounded-full bg-primary" style={{ width: `${projectCompletion}%` }} />
                         </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
                           <div className="rounded-md border bg-card px-2 py-1.5">
                             <div className="text-muted-foreground">待处理</div>
                             <div className="mt-0.5 font-semibold">{todoCount}</div>
@@ -189,8 +207,16 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                             <div className="mt-0.5 font-semibold">{inProgressCount}</div>
                           </div>
                           <div className="rounded-md border bg-card px-2 py-1.5">
+                            <div className="text-muted-foreground">待评审</div>
+                            <div className="mt-0.5 font-semibold">{reviewCount}</div>
+                          </div>
+                          <div className="rounded-md border bg-card px-2 py-1.5">
                             <div className="text-muted-foreground">已完成</div>
                             <div className="mt-0.5 font-semibold">{doneCount}</div>
+                          </div>
+                          <div className="rounded-md border bg-card px-2 py-1.5">
+                            <div className="text-muted-foreground">已关闭</div>
+                            <div className="mt-0.5 font-semibold">{closedCount}</div>
                           </div>
                         </div>
                       </div>
@@ -218,15 +244,6 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                         </div>
                       </div>
                     </div>
-
-                    {canManage ? (
-                      <details className="rounded-md border bg-background p-3">
-                        <summary className="cursor-pointer text-sm font-medium">编辑项目资料</summary>
-                        <div className="mt-3">
-                          <ProjectEditForm workspaceSlug={workspaceSlug} project={project} />
-                        </div>
-                      </details>
-                    ) : null}
                   </div>
                 </article>
               );
@@ -243,57 +260,6 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             </div>
           )}
         </section>
-
-        {canCreateProject ? (
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  新建项目
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">项目 Key 会用于任务编号和 URL 识别。</p>
-              </CardHeader>
-              <CardContent>
-                <ProjectForm workspaceSlug={workspaceSlug} />
-              </CardContent>
-            </Card>
-            <div className="rounded-lg border bg-card p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                项目规则
-              </div>
-              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                <p>工作区管理员可以创建项目，并自动成为项目负责人。</p>
-                <p>项目负责人管理成员；项目成员可处理任务；只读成员仅查看。</p>
-              </div>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                当前状态
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-muted-foreground">任务总数</div>
-                  <div className="mt-1 font-semibold">{totalIssues}</div>
-                </div>
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-muted-foreground">完成任务</div>
-                  <div className="mt-1 font-semibold">{doneIssues}</div>
-                </div>
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-muted-foreground">项目成员</div>
-                  <div className="mt-1 font-semibold">{uniqueMembers}</div>
-                </div>
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-muted-foreground">完成率</div>
-                  <div className="mt-1 font-semibold">{completionRate}%</div>
-                </div>
-              </div>
-            </div>
-          </aside>
-        ) : null}
       </div>
     </AppShell>
   );

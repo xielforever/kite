@@ -14,18 +14,18 @@ const demoUsers: {
   name: string;
   systemRole?: SystemRoleValue;
 }[] = [
-  { key: "owner", email: "owner@example.com", name: "Owner 用户", systemRole: "SUPER_ADMIN" },
-  { key: "admin", email: "pm-admin@example.com", name: "Admin 用户" },
-  { key: "lead", email: "lead@example.com", name: "项目负责人" },
-  { key: "member", email: "member@example.com", name: "项目成员" },
-  { key: "viewer", email: "viewer@example.com", name: "只读成员" },
-  { key: "outsider", email: "outsider@example.com", name: "外部用户" },
+  { key: "owner", email: "owner@example.com", name: "张无忌", systemRole: "SUPER_ADMIN" },
+  { key: "admin", email: "pm-admin@example.com", name: "赵敏" },
+  { key: "lead", email: "lead@example.com", name: "周芷若" },
+  { key: "member", email: "member@example.com", name: "殷离" },
+  { key: "viewer", email: "viewer@example.com", name: "小昭" },
+  { key: "outsider", email: "outsider@example.com", name: "宋青书" },
 ] as const;
 
 type UserKey = (typeof demoUsers)[number]["key"];
 type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
 type ProjectRoleValue = "LEAD" | "MEMBER" | "VIEWER";
-type IssueStatusValue = "TODO" | "IN_PROGRESS" | "DONE";
+type IssueStatusValue = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE" | "CLOSED";
 type IssuePriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 type DemoIssue = {
@@ -103,7 +103,7 @@ const projectSeeds: DemoProject[] = [
       {
         title: "确认只读角色禁止编辑",
         description: "viewer@example.com 可以查看 PLAT，但不能创建、编辑、拖拽任务。",
-        status: "DONE",
+        status: "REVIEW",
         priority: "MEDIUM",
         assigneeKey: "viewer",
         dueInDays: -2,
@@ -153,7 +153,7 @@ const projectSeeds: DemoProject[] = [
       {
         title: "整理服务器访问清单",
         description: "补齐账号归属、权限范围和到期时间。",
-        status: "DONE",
+        status: "CLOSED",
         priority: "MEDIUM",
         assigneeKey: "viewer",
         dueInDays: -4,
@@ -204,7 +204,7 @@ const projectSeeds: DemoProject[] = [
       {
         title: "历史需求归档确认",
         description: "归档项目默认不出现在活跃项目列表。",
-        status: "DONE",
+        status: "REVIEW",
         priority: "LOW",
         assigneeKey: "lead",
         dueInDays: -12,
@@ -220,6 +220,76 @@ function dueDate(daysFromNow?: number) {
   date.setDate(date.getDate() + daysFromNow);
   date.setHours(18, 0, 0, 0);
   return date;
+}
+
+function activityDate(projectIndex: number, issueNumber: number, step: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - (projectIndex * 4 + issueNumber));
+  date.setHours(9, step * 11, step * 7, 0);
+  return date;
+}
+
+function lifecycleActivities(issueSeed: DemoIssue, projectKey: string, issueNumber: number, projectIndex: number, users: Record<UserKey, { id: string; name: string }>) {
+  const actorKey = issueSeed.assigneeKey ?? "owner";
+  const activities: { actorKey: UserKey; action: string; detail?: string; createdAt: Date }[] = [
+    {
+      actorKey: "owner",
+      action: "创建任务",
+      detail: `${projectKey}-${issueNumber}`,
+      createdAt: activityDate(projectIndex, issueNumber, 0),
+    },
+  ];
+
+  let step = 1;
+  if (issueSeed.assigneeKey) {
+    activities.push({
+      actorKey: "owner",
+      action: "分配负责人",
+      detail: users[issueSeed.assigneeKey].name,
+      createdAt: activityDate(projectIndex, issueNumber, step),
+    });
+    step += 1;
+  }
+
+  if (["IN_PROGRESS", "REVIEW", "DONE", "CLOSED"].includes(issueSeed.status)) {
+    activities.push({
+      actorKey,
+      action: "移动任务",
+      detail: "进行中",
+      createdAt: activityDate(projectIndex, issueNumber, step),
+    });
+    step += 1;
+  }
+
+  if (["REVIEW", "DONE"].includes(issueSeed.status)) {
+    activities.push({
+      actorKey,
+      action: "提交评审",
+      detail: "待评审",
+      createdAt: activityDate(projectIndex, issueNumber, step),
+    });
+    step += 1;
+  }
+
+  if (issueSeed.status === "DONE") {
+    activities.push({
+      actorKey: "owner",
+      action: "完成任务",
+      detail: "已完成",
+      createdAt: activityDate(projectIndex, issueNumber, step),
+    });
+  }
+
+  if (issueSeed.status === "CLOSED") {
+    activities.push({
+      actorKey: "owner",
+      action: "关闭任务",
+      detail: "已关闭",
+      createdAt: activityDate(projectIndex, issueNumber, step),
+    });
+  }
+
+  return activities;
 }
 
 async function main() {
@@ -266,8 +336,9 @@ async function main() {
 
     let issueCount = 0;
     let commentCount = 0;
+    let activityCount = 0;
 
-    for (const projectSeed of projectSeeds) {
+    for (const [projectIndex, projectSeed] of projectSeeds.entries()) {
       const project = await tx.project.create({
         data: {
           workspaceId: workspace.id,
@@ -304,31 +375,37 @@ async function main() {
           },
         });
 
-        await tx.issueActivity.create({
-          data: {
+        const activitySeeds = lifecycleActivities(issueSeed, project.key, issueNumber, projectIndex, users);
+        await tx.issueActivity.createMany({
+          data: activitySeeds.map((activity) => ({
             issueId: issue.id,
-            actorId: users.owner.id,
-            action: "创建任务",
-            detail: `${project.key}-${issueNumber}`,
-          },
+            actorId: users[activity.actorKey].id,
+            action: activity.action,
+            detail: activity.detail,
+            createdAt: activity.createdAt,
+          })),
         });
+        activityCount += activitySeeds.length;
 
         if (issueSeed.comments?.length) {
           await tx.issueComment.createMany({
-            data: issueSeed.comments.map((comment) => ({
+            data: issueSeed.comments.map((comment, commentIndex) => ({
               issueId: issue.id,
               authorId: users[comment.authorKey].id,
               body: comment.body,
+              createdAt: activityDate(projectIndex, issueNumber, activitySeeds.length + commentIndex),
             })),
           });
           await tx.issueActivity.createMany({
-            data: issueSeed.comments.map((comment) => ({
+            data: issueSeed.comments.map((comment, commentIndex) => ({
               issueId: issue.id,
               actorId: users[comment.authorKey].id,
               action: "添加评论",
+              createdAt: activityDate(projectIndex, issueNumber, activitySeeds.length + commentIndex),
             })),
           });
           commentCount += issueSeed.comments.length;
+          activityCount += issueSeed.comments.length;
         }
 
         issueCount += 1;
@@ -342,6 +419,7 @@ async function main() {
       projectCount: projectSeeds.length,
       issueCount,
       commentCount,
+      activityCount,
     };
   });
 
@@ -352,14 +430,15 @@ async function main() {
   console.log(`Projects: ${result.projectCount}`);
   console.log(`Issues: ${result.issueCount}`);
   console.log(`Comments: ${result.commentCount}`);
+  console.log(`Activities: ${result.activityCount}`);
   console.log("");
   console.log("Login accounts (password: plane):");
-  console.log("- owner@example.com      workspace OWNER, can see/manage all projects");
-  console.log("- pm-admin@example.com   workspace ADMIN, can see/manage all projects");
-  console.log("- lead@example.com       workspace MEMBER, PLAT LEAD, ARCH MEMBER");
-  console.log("- member@example.com     workspace MEMBER, PLAT MEMBER, OPS LEAD");
-  console.log("- viewer@example.com     workspace MEMBER, PLAT/OPS VIEWER");
-  console.log("- outsider@example.com   no workspace membership");
+  console.log("- owner@example.com      张无忌, workspace OWNER, can see/manage all projects");
+  console.log("- pm-admin@example.com   赵敏, workspace ADMIN, can see/manage all projects");
+  console.log("- lead@example.com       周芷若, workspace MEMBER, PLAT LEAD, ARCH MEMBER");
+  console.log("- member@example.com     殷离, workspace MEMBER, PLAT MEMBER, OPS LEAD");
+  console.log("- viewer@example.com     小昭, workspace MEMBER, PLAT/OPS VIEWER");
+  console.log("- outsider@example.com   宋青书, no workspace membership");
 }
 
 main()

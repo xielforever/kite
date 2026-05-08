@@ -7,8 +7,8 @@ import { compare, hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { signIn, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { WorkspaceRoleValue } from "@/lib/constants";
-import { userPublicFields } from "@/lib/constants";
+import type { IssueStatusValue, WorkspaceRoleValue } from "@/lib/constants";
+import { canTransitionIssueStatus, statusLabels } from "@/lib/constants";
 import {
   ForbiddenError,
   requireProject,
@@ -192,7 +192,9 @@ export async function createWorkspaceAction(_state: ActionState, formData: FormD
 }
 
 export async function updateWorkspaceAction(workspaceSlug: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { workspace } = await requireWorkspaceAdmin(workspaceSlug);
+  await requireSystemAdmin();
+  const workspace = await prisma.workspace.findUnique({ where: { slug: workspaceSlug } });
+  if (!workspace) return { error: "工作区不存在" };
   const parsed = workspaceUpdateSchema.safeParse({
     name: formValue(formData, "name"),
     slug: formValue(formData, "slug"),
@@ -248,6 +250,18 @@ export async function addMemberAction(workspaceSlug: string, _state: ActionState
               update: { role: "LEAD" },
               create: { projectId: project.id, userId: user.id, role: "LEAD" },
             });
+          }
+        }
+      } else {
+        const autoJoinProjects = await tx.project.findMany({
+          where: { workspaceId: workspace.id, autoJoin: true, archived: false },
+          select: { id: true },
+        });
+        if (autoJoinProjects.length) {
+          for (const project of autoJoinProjects) {
+            await tx.projectMember.create({
+              data: { projectId: project.id, userId: user.id, role: "MEMBER" },
+            }).catch(() => {});
           }
         }
       }
@@ -344,6 +358,18 @@ export async function acceptInvitationAction(token: string) {
           });
         }
       }
+    } else if (!existing) {
+      const autoJoinProjects = await tx.project.findMany({
+        where: { workspaceId: invitation.workspaceId, autoJoin: true, archived: false },
+        select: { id: true },
+      });
+      if (autoJoinProjects.length) {
+        for (const project of autoJoinProjects) {
+          await tx.projectMember.create({
+            data: { projectId: project.id, userId: user.id, role: "MEMBER" },
+          }).catch(() => {});
+        }
+      }
     }
 
     return invitation.workspace.slug;
@@ -355,7 +381,7 @@ export async function acceptInvitationAction(token: string) {
 export async function updateMemberRoleAction(workspaceSlug: string, memberId: string, role: WorkspaceRoleValue) {
   const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
   if (!canChangeRole(membership.role, role)) throw new ForbiddenError("只有所有者可以设置该角色");
-  const target = await prisma.workspaceMember.findUnique({ where: { id: memberId } });
+  const target = await prisma.workspaceMember.findFirst({ where: { id: memberId, workspaceId: workspace.id } });
   if (!target) return;
   if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
     throw new ForbiddenError("只有所有者可以修改管理员或所有者的角色");
@@ -380,6 +406,24 @@ export async function updateMemberRoleAction(workspaceSlug: string, memberId: st
           });
         }
       }
+    } else {
+      const projects = await tx.project.findMany({
+        where: { workspaceId: workspace.id },
+        select: { id: true },
+      });
+      if (projects.length) {
+        for (const project of projects) {
+          const pm = await tx.projectMember.findUnique({
+            where: { projectId_userId: { projectId: project.id, userId: target.userId } },
+          });
+          if (pm && pm.role === "LEAD") {
+            await tx.projectMember.update({
+              where: { id: pm.id },
+              data: { role: "MEMBER" },
+            });
+          }
+        }
+      }
     }
   });
   revalidatePath(`/w/${workspaceSlug}/settings/members`);
@@ -387,7 +431,7 @@ export async function updateMemberRoleAction(workspaceSlug: string, memberId: st
 
 export async function removeMemberAction(workspaceSlug: string, memberId: string) {
   const { membership, workspace } = await requireWorkspaceAdmin(workspaceSlug);
-  const target = await prisma.workspaceMember.findUnique({ where: { id: memberId } });
+  const target = await prisma.workspaceMember.findFirst({ where: { id: memberId, workspaceId: workspace.id } });
   if (!target) return;
   if (membership.role !== "OWNER" && (target.role === "OWNER" || target.role === "ADMIN")) {
     throw new ForbiddenError("只有所有者可以移除管理员或所有者");
@@ -406,11 +450,15 @@ export async function removeMemberAction(workspaceSlug: string, memberId: string
 }
 
 export async function createProjectAction(workspaceSlug: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { user, workspace } = await requireWorkspaceAdmin(workspaceSlug);
+  const user = await requireSystemAdmin();
+  const workspace = await prisma.workspace.findUnique({ where: { slug: workspaceSlug } });
+  if (!workspace) return { error: "工作区不存在" };
   const parsed = projectSchema.safeParse({
     name: formValue(formData, "name"),
     key: formValue(formData, "key") || projectKey(formValue(formData, "name")),
     description: formValue(formData, "description"),
+    defaultDueDays: formValue(formData, "defaultDueDays"),
+    autoJoin: formData.get("autoJoin") === "on" ? "on" : undefined,
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
@@ -421,6 +469,8 @@ export async function createProjectAction(workspaceSlug: string, _state: ActionS
         name: parsed.data.name,
         key: parsed.data.key,
         description: parsed.data.description || null,
+        defaultDueDays: parsed.data.defaultDueDays ? Number(parsed.data.defaultDueDays) : null,
+        autoJoin: parsed.data.autoJoin === "on",
         members: {
           create: { userId: user.id, role: "LEAD" },
         },
@@ -460,8 +510,10 @@ export async function updateProjectAction(workspaceSlug: string, projectId: stri
   const { project } = await requireProjectAdminById(workspaceSlug, projectId);
   const parsed = projectSchema.safeParse({
     name: formValue(formData, "name"),
-    key: formValue(formData, "key") || projectKey(formValue(formData, "name")),
+    key: project.key,
     description: formValue(formData, "description"),
+    defaultDueDays: formValue(formData, "defaultDueDays"),
+    autoJoin: formData.get("autoJoin") === "on" ? "on" : undefined,
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
@@ -470,18 +522,16 @@ export async function updateProjectAction(workspaceSlug: string, projectId: stri
       where: { id: project.id },
       data: {
         name: parsed.data.name,
-        key: parsed.data.key,
         description: parsed.data.description || null,
+        defaultDueDays: parsed.data.defaultDueDays ? Number(parsed.data.defaultDueDays) : null,
+        autoJoin: parsed.data.autoJoin === "on",
       },
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "该项目 key 已存在" };
-    }
     return actionError(error);
   }
   revalidatePath(`/w/${workspaceSlug}/projects`);
-  revalidatePath(`/w/${workspaceSlug}/projects/${parsed.data.key}`);
+  revalidatePath(`/w/${workspaceSlug}/projects/${project.key}`);
   return { ok: true };
 }
 
@@ -525,7 +575,11 @@ export async function createIssueAction(workspaceSlug: string, projectKeyValue: 
         status: parsed.data.status,
         priority: parsed.data.priority,
         assigneeId: parsed.data.assigneeId || null,
-        dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+        dueDate: parsed.data.dueDate
+          ? new Date(parsed.data.dueDate)
+          : project.defaultDueDays
+            ? new Date(Date.now() + project.defaultDueDays * 24 * 60 * 60 * 1000)
+            : null,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1000,
       },
     });
@@ -583,6 +637,51 @@ export async function updateIssueAction(workspaceSlug: string, projectKeyValue: 
   return { ok: true };
 }
 
+export async function updateIssueStatusAction(workspaceSlug: string, projectKeyValue: string, issueId: string, status: IssueStatusValue) {
+  const { user, project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
+  const parsed = issueMoveSchema.pick({ status: true }).safeParse({ status });
+  if (!parsed.success) throw new ForbiddenError("状态不正确");
+
+  const issue = await prisma.issue.findFirst({
+    where: { id: issueId, projectId: project.id },
+    select: { id: true, status: true },
+  });
+  if (!issue) throw new ForbiddenError("任务不存在");
+  if (issue.status === parsed.data.status) return;
+  if (!canTransitionIssueStatus(issue.status, parsed.data.status)) {
+    throw new ForbiddenError(`不能从${statusLabels[issue.status]}直接流转到${statusLabels[parsed.data.status]}`);
+  }
+
+  const action =
+    parsed.data.status === "DONE"
+      ? "完成任务"
+      : parsed.data.status === "CLOSED"
+        ? "关闭任务"
+        : parsed.data.status === "REVIEW"
+          ? "提交评审"
+          : "移动任务";
+
+  await prisma.$transaction([
+    prisma.issue.update({
+      where: { id: issueId },
+      data: { status: parsed.data.status },
+    }),
+    prisma.issueActivity.create({
+      data: {
+        issueId,
+        actorId: user.id,
+        action,
+        detail: `${statusLabels[issue.status]} → ${statusLabels[parsed.data.status]}`,
+      },
+    }),
+  ]);
+
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/board`);
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues`);
+  revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}/issues/${issueId}`);
+}
+
 export async function deleteIssueAction(workspaceSlug: string, projectKeyValue: string, issueId: string) {
   const { project } = await requireProjectEditor(workspaceSlug, projectKeyValue);
   await prisma.issue.deleteMany({ where: { id: issueId, projectId: project.id } });
@@ -600,6 +699,9 @@ export async function moveIssue(input: unknown) {
   });
   if (!issue) throw new Error("任务不存在");
   const { user } = await requireProjectEditor(issue.project.workspace.slug, issue.project.key);
+  if (issue.status !== status && !canTransitionIssueStatus(issue.status, status)) {
+    throw new Error(`不能从${statusLabels[issue.status]}直接流转到${statusLabels[status]}`);
+  }
 
   let sortOrder = Date.now();
   if (overIssueId) {
@@ -675,22 +777,19 @@ export async function updateCommentAction(workspaceSlug: string, projectKeyValue
 }
 
 export async function addProjectMemberAction(workspaceSlug: string, projectKeyValue: string, _state: ActionState, formData: FormData): Promise<ActionState> {
-  const { workspace, project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
+  const { project } = await requireProjectAdmin(workspaceSlug, projectKeyValue);
   const parsed = projectMemberSchema.safeParse({
     email: formValue(formData, "email").toLowerCase(),
     role: formValue(formData, "role") || "MEMBER",
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message };
 
-  const member = await prisma.workspaceMember.findFirst({
-    where: { workspaceId: workspace.id, user: { email: parsed.data.email } },
-    include: { user: { select: userPublicFields } },
-  });
-  if (!member) return { error: "该用户尚未加入工作区" };
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
+  if (!user) return { error: "该用户尚未注册" };
 
   try {
     await prisma.projectMember.create({
-      data: { projectId: project.id, userId: member.userId, role: parsed.data.role },
+      data: { projectId: project.id, userId: user.id, role: parsed.data.role },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -712,6 +811,11 @@ export async function updateProjectMemberRoleAction(workspaceSlug: string, proje
     data: { role: parsed.data.role },
   });
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+}
+
+export async function updateProjectMemberRoleFormAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string, formData: FormData) {
+  const role = String(formData.get("role") ?? "");
+  await updateProjectMemberRoleAction(workspaceSlug, projectKeyValue, projectMemberId, role);
 }
 
 export async function removeProjectMemberAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string) {

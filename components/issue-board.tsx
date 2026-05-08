@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { statusColumns, statusLabels, type IssueStatusValue } from "@/lib/constants";
+import { canTransitionIssueStatus, statusColumns, statusLabels, type IssueStatusValue } from "@/lib/constants";
 import { IssueCard, type IssueCardData } from "@/components/issue-card";
 
 type BoardIssue = IssueCardData & { sortOrder: number };
@@ -74,6 +74,12 @@ export function IssueBoard({
       ? (overId as IssueStatusValue)
       : localIssues.find((issue) => issue.id === overId)?.status;
     if (!status) return;
+    const activeIssue = localIssues.find((issue) => issue.id === activeId);
+    if (!activeIssue) return;
+    if (activeIssue.status !== status && !canTransitionIssueStatus(activeIssue.status, status)) {
+      setToast({ type: "err", message: `不能从${statusLabels[activeIssue.status]}直接流转到${statusLabels[status]}` });
+      return;
+    }
 
     setLocalIssues((current) =>
       current.map((issue) => (issue.id === activeId ? { ...issue, status, sortOrder: Date.now() } : issue)),
@@ -101,7 +107,7 @@ export function IssueBoard({
           </div>
         ) : null}
       </div>
-      <div className="grid gap-4 lg:grid-cols-3 md:grid-cols-1">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {statusColumns.map((status) => (
           <BoardColumn
             key={status}

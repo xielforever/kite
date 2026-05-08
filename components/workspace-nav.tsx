@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, FolderKanban, LayoutDashboard, Settings, Users } from "lucide-react";
+import { Archive, FolderKanban, LayoutDashboard, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { key: "overview", label: "总览", href: "", icon: LayoutDashboard },
   { key: "projects", label: "项目", href: "/projects", icon: FolderKanban },
   { key: "archived", label: "归档", href: "/projects/archived", icon: Archive },
-  { key: "members", label: "成员", href: "/settings/members", icon: Users },
   { key: "settings", label: "设置", href: "/settings/general", icon: Settings },
 ];
 
@@ -17,7 +16,6 @@ function activeKey(pathname: string, basePath: string) {
   if (pathname === basePath) return "overview";
   if (pathname.startsWith(`${basePath}/projects/archived`)) return "archived";
   if (pathname.startsWith(`${basePath}/projects`)) return "projects";
-  if (pathname.startsWith(`${basePath}/settings/members`)) return "members";
   if (pathname.startsWith(`${basePath}/settings`)) return "settings";
   return "";
 }

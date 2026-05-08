@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, FolderKanban, LayoutList, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, FolderKanban, LayoutList, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
-import { canManageWorkspace } from "@/lib/role-rules";
+import { canAccessAllWorkspaces } from "@/lib/role-rules";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,26 +18,29 @@ export default async function WorkspaceHomePage({
   params: Promise<{ workspaceSlug: string }>;
 }) {
   const { workspaceSlug } = await params;
-  const { user, workspace, membership } = await requireWorkspace(workspaceSlug);
-  const isWorkspaceAdmin = canManageWorkspace(membership.role);
+  const { user, workspace } = await requireWorkspace(workspaceSlug);
+  const isSystemAdmin = canAccessAllWorkspaces(user.systemRole);
   const visibleProjectWhere = {
     workspaceId: workspace.id,
     archived: false,
-    ...(isWorkspaceAdmin ? {} : { members: { some: { userId: user.id } } }),
+    ...(isSystemAdmin ? {} : { members: { some: { userId: user.id } } }),
   };
-  const [projectCount, memberCount, openIssueCount, doneIssueCount] = await Promise.all([
-    prisma.project.count({ where: visibleProjectWhere }),
-    prisma.workspaceMember.count({ where: { workspaceId: workspace.id } }),
+  const [visibleProjects, openIssueCount, doneIssueCount] = await Promise.all([
+    prisma.project.findMany({
+      where: visibleProjectWhere,
+      include: { members: { select: { userId: true } } },
+    }),
     prisma.issue.count({
-      where: { project: visibleProjectWhere, status: { not: "DONE" } },
+      where: { project: visibleProjectWhere, status: { notIn: ["DONE", "CLOSED"] } },
     }),
     prisma.issue.count({
       where: { project: visibleProjectWhere, status: "DONE" },
     }),
   ]);
+  const projectCount = visibleProjects.length;
+  const memberCount = new Set(visibleProjects.flatMap((project) => project.members.map((member) => member.userId))).size;
   const totalIssueCount = openIssueCount + doneIssueCount;
   const completionRate = percent(doneIssueCount, totalIssueCount);
-  const memberHref = isWorkspaceAdmin ? `/w/${workspaceSlug}/settings/members` : `/w/${workspaceSlug}/projects`;
 
   return (
     <AppShell title={workspace.name} subtitle="工作区总览" workspaceSlug={workspaceSlug}>
@@ -52,7 +55,7 @@ export default async function WorkspaceHomePage({
               通过下方卡片进入对应功能区。卡片本身就是快捷入口，顶部菜单保留用于跨页面切换。
             </p>
           </div>
-          <Badge className="w-fit">{isWorkspaceAdmin ? "管理视图" : "成员视图"}</Badge>
+          <Badge className="w-fit">{isSystemAdmin ? "系统管理视图" : "项目权限视图"}</Badge>
         </div>
         <div className="grid gap-px bg-border md:grid-cols-4">
           <div className="bg-card p-4">
@@ -64,7 +67,7 @@ export default async function WorkspaceHomePage({
             <p className="mt-1 text-2xl font-semibold">{openIssueCount}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">工作区成员</p>
+            <p className="text-xs text-muted-foreground">项目成员</p>
             <p className="mt-1 text-2xl font-semibold">{memberCount}</p>
           </div>
           <div className="bg-card p-4">
@@ -122,20 +125,18 @@ export default async function WorkspaceHomePage({
           </Card>
         </Link>
 
-        <Link href={memberHref} className="group block">
+        <Link href={`/w/${workspaceSlug}/projects`} className="group block">
           <Card className="h-full transition hover:border-primary/50 hover:shadow-md">
             <CardContent className="p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-11 w-11 items-center justify-center rounded-md border bg-background text-primary">
-                  {isWorkspaceAdmin ? <ShieldCheck className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                  <ShieldCheck className="h-5 w-5" />
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
               </div>
               <div className="mt-5">
-                <h2 className="text-base font-semibold">{isWorkspaceAdmin ? "成员与权限" : "团队成员"}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {isWorkspaceAdmin ? "管理工作区成员、邀请链接和成员角色。" : "查看当前项目范围，了解团队协作入口。"}
-                </p>
+                <h2 className="text-base font-semibold">项目权限</h2>
+                <p className="mt-2 text-sm text-muted-foreground">成员可见范围由项目角色决定，只能进入已加入的项目。</p>
               </div>
               <div className="mt-5 flex items-end justify-between border-t pt-4">
                 <span className="text-xs text-muted-foreground">成员数量</span>

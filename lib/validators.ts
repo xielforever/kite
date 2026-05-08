@@ -54,6 +54,8 @@ export const projectSchema = z.object({
     .max(8)
     .regex(/^[A-Z0-9]+$/, "项目 key 只能包含大写字母和数字"),
   description: z.string().trim().max(600).optional().or(z.literal("")),
+  defaultDueDays: z.coerce.number().int().min(1).max(365).optional().or(z.literal("")),
+  autoJoin: z.enum(["on"]).optional(),
 });
 
 export const projectMemberSchema = z.object({

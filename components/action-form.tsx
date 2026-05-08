@@ -11,18 +11,23 @@ export function ActionForm({
   submitLabel,
   pendingLabel,
   className,
+  onSuccess,
 }: {
   action: (state: { error?: string }, formData: FormData) => Promise<{ error?: string; ok?: boolean }>;
   children: React.ReactNode;
   submitLabel: string;
   pendingLabel?: string;
   className?: string;
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [state, formAction] = useActionState(action, {});
   useEffect(() => {
-    if (state.ok) router.refresh();
-  }, [router, state.ok]);
+    if (state.ok) {
+      router.refresh();
+      onSuccess?.();
+    }
+  }, [router, state.ok, onSuccess]);
 
   return (
     <form action={formAction} className={className ?? "space-y-4"}>

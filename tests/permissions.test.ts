@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   canAccessAllWorkspaces,
-  canChangeProjectRole,
   canChangeRole,
   canCreateWorkspace,
   canEditProjectContent,
@@ -36,7 +35,5 @@ describe("permissions", () => {
     expect(canManageProject("MEMBER")).toBe(false);
     expect(canEditProjectContent("MEMBER")).toBe(true);
     expect(canEditProjectContent("VIEWER")).toBe(false);
-    expect(canChangeProjectRole("LEAD")).toBe(true);
-    expect(canChangeProjectRole("VIEWER")).toBe(false);
   });
 });

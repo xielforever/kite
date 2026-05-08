@@ -2,7 +2,7 @@ import Link from "next/link";
 import { deleteProjectAction, restoreProjectAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
-import { canManageProject, canManageWorkspace } from "@/lib/role-rules";
+import { canAccessAllWorkspaces, canManageProject } from "@/lib/role-rules";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,13 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 export default async function ArchivedProjectsPage({ params }: { params: Promise<{ workspaceSlug: string }> }) {
   const { workspaceSlug } = await params;
-  const { user, workspace, membership } = await requireWorkspace(workspaceSlug);
-  const isWorkspaceAdmin = canManageWorkspace(membership.role);
+  const { user, workspace } = await requireWorkspace(workspaceSlug);
+  const isSystemAdmin = canAccessAllWorkspaces(user.systemRole);
   const projects = await prisma.project.findMany({
     where: {
       workspaceId: workspace.id,
       archived: true,
-      ...(isWorkspaceAdmin ? {} : { members: { some: { userId: user.id, role: "LEAD" } } }),
+      ...(isSystemAdmin ? {} : { members: { some: { userId: user.id, role: "LEAD" } } }),
     },
     include: { members: true },
     orderBy: { updatedAt: "desc" },
@@ -33,7 +33,7 @@ export default async function ArchivedProjectsPage({ params }: { params: Promise
       <div className="grid gap-4 md:grid-cols-2">
         {projects.map((project) => {
           const projectMembership = project.members.find((member) => member.userId === user.id);
-          const canManage = isWorkspaceAdmin || canManageProject(projectMembership?.role);
+          const canManage = isSystemAdmin || canManageProject(projectMembership?.role);
           return (
           <Card key={project.id}>
             <CardHeader>

@@ -39,3 +39,12 @@ export function formatDate(value?: Date | string | null) {
     typeof value === "string" ? new Date(value) : value,
   );
 }
+
+export function formatDateTime(value?: Date | string | null) {
+  if (!value) return "未设置";
+  return new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    hour12: false,
+  }).format(typeof value === "string" ? new Date(value) : value);
+}

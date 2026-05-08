@@ -24,7 +24,3 @@ export function canChangeRole(actorRole: WorkspaceRoleValue, targetRole: Workspa
   if (actorRole !== "OWNER") return targetRole === "MEMBER";
   return true;
 }
-
-export function canChangeProjectRole(actorRole?: ProjectRoleValue | null) {
-  return actorRole === "LEAD";
-}

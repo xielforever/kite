@@ -5,7 +5,7 @@ Kite 是一个面向内部团队的轻量项目管理系统，首版提供多工
 ## 环境要求
 
 - Node.js 22 或更高版本
-- pnpm 9 或更高版本
+- npm 11 或更高版本
 - PostgreSQL 15 或更高版本
 
 ## 本地开发
@@ -37,25 +37,15 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kite_user;
 ### 项目初始化
 
 ```bash
-corepack enable
-corepack prepare pnpm@9.15.4 --activate
-pnpm install
+npm install
 cp .env.example .env
 # 修改 .env 中的 DATABASE_URL 为实际值，例如：
 # DATABASE_URL="postgresql://kite_user:your_password@localhost:5432/kite?schema=public"
-pnpm prisma:migrate
-pnpm dev
-```
-
-访问 `http://localhost:3000`，注册第一个用户后需由系统管理员创建工作区并添加成员。
-
-如果当前机器不能使用 pnpm，也可以用 npm fallback：
-
-```bash
-npm install
 npm run prisma:migrate
 npm run dev
 ```
+
+访问 `http://localhost:3000`。工作区和项目均由系统管理员创建；普通用户通过项目成员角色获得对应工作区与项目的访问权限。
 
 ## 初始化管理员
 
@@ -65,7 +55,7 @@ npm run dev
 - 初始密码：`plane`
 - 系统角色：`SUPER_ADMIN`
 
-默认管理员首次登录必须修改密码，修改后才能进入工作区。只有系统角色为 `SUPER_ADMIN` 的账号可以新建工作区，普通用户需要被添加到已有工作区后才能使用项目和任务功能。
+默认管理员首次登录必须修改密码，修改后才能进入工作区。只有系统角色为 `SUPER_ADMIN` 的账号可以新建工作区和项目；普通用户需要被加入具体项目后才能看到对应工作区与项目。
 
 ```bash
 npm run reset-db
@@ -81,22 +71,20 @@ npm run seed:demo
 
 该脚本只会重建 `kite-demo` 工作区和以下演示账号，密码均为 `plane`：
 
-- `owner@example.com`：工作区 OWNER，可查看和管理全部项目。
-- `pm-admin@example.com`：工作区 ADMIN，可查看和管理全部项目。
-- `lead@example.com`：工作区 MEMBER，`PLAT` 项目 LEAD，`ARCH` 项目 MEMBER。
-- `member@example.com`：工作区 MEMBER，`PLAT` 项目 MEMBER，`OPS` 项目 LEAD。
-- `viewer@example.com`：工作区 MEMBER，`PLAT`/`OPS` 项目 VIEWER。
-- `outsider@example.com`：无工作区成员身份，用于验证访问隔离。
+- `owner@example.com`（张无忌）：工作区 OWNER，可查看和管理全部项目。
+- `pm-admin@example.com`（赵敏）：工作区 ADMIN，可查看和管理全部项目。
+- `lead@example.com`（周芷若）：工作区 MEMBER，`PLAT` 项目 LEAD，`ARCH` 项目 MEMBER。
+- `member@example.com`（殷离）：工作区 MEMBER，`PLAT` 项目 MEMBER，`OPS` 项目 LEAD。
+- `viewer@example.com`（小昭）：工作区 MEMBER，`PLAT`/`OPS` 项目 VIEWER。
+- `outsider@example.com`（宋青书）：无项目成员身份，用于验证访问隔离。
 
 ## 生产部署（裸机 Node）
 
 ```bash
-corepack enable
-corepack prepare pnpm@9.15.4 --activate
-pnpm install --frozen-lockfile
-pnpm prisma:deploy
-pnpm build
-pnpm start
+npm ci
+npm run prisma:deploy
+npm run build
+npm run start
 ```
 
 生产环境必须设置：
@@ -134,9 +122,9 @@ pm2 startup
 
 ```bash
 git pull
-pnpm install --frozen-lockfile
-pnpm prisma:deploy
-pnpm build
+npm ci
+npm run prisma:deploy
+npm run build
 pm2 restart kite
 ```
 
@@ -172,4 +160,4 @@ sudo systemctl start kite
 
 ## 功能边界
 
-首版不包含附件、实时协作、Cycles、Modules、Pages、Analytics、AI、计费或审计日志。任务状态固定为 `待处理`、`进行中`、`已完成`。
+首版不包含附件、实时协作、Cycles、Modules、Pages、Analytics、AI 或计费。任务生命周期状态固定为 `待处理`、`进行中`、`待评审`、`已完成`、`已关闭`。

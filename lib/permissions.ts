@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { forbidden } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canAccessAllWorkspaces, canCreateWorkspace, canEditProjectContent, canManageProject, canManageWorkspace } from "@/lib/role-rules";
+import { canAccessAllWorkspaces, canCreateWorkspace, canEditProjectContent, canManageProject } from "@/lib/role-rules";
 export {
   canAccessAllWorkspaces,
   canChangeRole,
@@ -37,15 +37,24 @@ export async function requireSystemAdmin() {
 }
 
 export async function getWorkspaceMembership(workspaceSlug: string, userId: string) {
-  return prisma.workspaceMember.findFirst({
+  const projectMembership = await prisma.projectMember.findFirst({
     where: {
       userId,
-      workspace: { slug: workspaceSlug },
+      project: { workspace: { slug: workspaceSlug } },
     },
-    include: {
-      workspace: true,
-    },
+    include: { project: { include: { workspace: true } } },
   });
+  if (!projectMembership) return null;
+  const workspace = projectMembership.project.workspace;
+  return {
+    id: "__project_access__",
+    workspaceId: workspace.id,
+    userId,
+    role: "MEMBER" as const,
+    workspace,
+    createdAt: projectMembership.createdAt,
+    updatedAt: projectMembership.updatedAt,
+  };
 }
 
 export async function requireWorkspace(workspaceSlug: string) {
@@ -78,7 +87,7 @@ export async function requireWorkspace(workspaceSlug: string) {
 
 export async function requireWorkspaceAdmin(workspaceSlug: string) {
   const result = await requireWorkspace(workspaceSlug);
-  if (!canManageWorkspace(result.membership.role)) {
+  if (!result.isSystemAdmin) {
     forbidden();
   }
   return result;
@@ -86,12 +95,11 @@ export async function requireWorkspaceAdmin(workspaceSlug: string) {
 
 export async function requireProject(workspaceSlug: string, projectKey: string) {
   const context = await requireWorkspace(workspaceSlug);
-  const workspaceAdmin = canManageWorkspace(context.membership.role);
   const project = await prisma.project.findFirst({
     where: {
       key: projectKey,
       workspaceId: context.workspace.id,
-      ...(workspaceAdmin ? {} : { members: { some: { userId: context.user.id } } }),
+      ...(context.isSystemAdmin ? {} : { members: { some: { userId: context.user.id } } }),
     },
   });
   if (!project) forbidden();
@@ -104,8 +112,8 @@ export async function requireProject(workspaceSlug: string, projectKey: string) 
     project,
     projectMembership,
     projectRole,
-    canManageProject: workspaceAdmin || canManageProject(projectRole),
-    canEditProject: workspaceAdmin || canEditProjectContent(projectRole),
+    canManageProject: context.isSystemAdmin || canManageProject(projectRole),
+    canEditProject: context.isSystemAdmin || canEditProjectContent(projectRole),
   };
 }
 
@@ -127,12 +135,11 @@ export async function requireProjectEditor(workspaceSlug: string, projectKey: st
 
 export async function requireProjectById(workspaceSlug: string, projectId: string) {
   const context = await requireWorkspace(workspaceSlug);
-  const workspaceAdmin = canManageWorkspace(context.membership.role);
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
       workspaceId: context.workspace.id,
-      ...(workspaceAdmin ? {} : { members: { some: { userId: context.user.id } } }),
+      ...(context.isSystemAdmin ? {} : { members: { some: { userId: context.user.id } } }),
     },
   });
   if (!project) forbidden();
@@ -145,8 +152,8 @@ export async function requireProjectById(workspaceSlug: string, projectId: strin
     project,
     projectMembership,
     projectRole,
-    canManageProject: workspaceAdmin || canManageProject(projectRole),
-    canEditProject: workspaceAdmin || canEditProjectContent(projectRole),
+    canManageProject: context.isSystemAdmin || canManageProject(projectRole),
+    canEditProject: context.isSystemAdmin || canEditProjectContent(projectRole),
   };
 }
 

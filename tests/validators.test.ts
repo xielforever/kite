@@ -121,6 +121,18 @@ describe("issueSchema", () => {
       dueDate: "",
     }).success).toBe(true);
   });
+  it("accepts lifecycle statuses", () => {
+    for (const status of ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "CLOSED"]) {
+      expect(issueSchema.safeParse({
+        title: "任务",
+        description: "",
+        status,
+        priority: "MEDIUM",
+        assigneeId: "",
+        dueDate: "",
+      }).success).toBe(true);
+    }
+  });
   it("rejects empty title", () => {
     expect(issueSchema.safeParse({
       title: "",
@@ -145,7 +157,7 @@ describe("issueSchema", () => {
 
 describe("issueMoveSchema", () => {
   it("accepts valid move", () => {
-    expect(issueMoveSchema.safeParse({ issueId: "abc123", status: "DONE" }).success).toBe(true);
+    expect(issueMoveSchema.safeParse({ issueId: "abc123", status: "REVIEW" }).success).toBe(true);
   });
   it("accepts move with overIssueId", () => {
     expect(issueMoveSchema.safeParse({ issueId: "abc123", status: "IN_PROGRESS", overIssueId: "def456" }).success).toBe(true);

@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { CommentEditForm } from "@/components/comment-edit-form";
 import { CommentForm } from "@/components/comment-form";
 import { IssueForm } from "@/components/issue-form";
+import { IssueStatusActions } from "@/components/issue-status-actions";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
@@ -10,7 +11,7 @@ import { deleteCommentAction, deleteIssueAction } from "@/lib/actions";
 import { priorityLabels, statusLabels, userPublicFields } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/permissions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 export default async function IssueDetailPage({
   params,
@@ -69,7 +70,7 @@ export default async function IssueDetailPage({
                 <div key={activity.id} className="rounded-md border p-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium">{activity.actor?.name ?? "已删除用户"} · {activity.action}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(activity.createdAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
                   </div>
                   {activity.detail ? <p className="mt-1 text-muted-foreground">{activity.detail}</p> : null}
                 </div>
@@ -124,7 +125,16 @@ export default async function IssueDetailPage({
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle>编辑任务</CardTitle>
+                  <CardTitle>状态流转</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <IssueStatusActions workspaceSlug={workspaceSlug} projectKey={projectKey} issueId={issue.id} currentStatus={issue.status} />
+                  <p className="text-xs text-muted-foreground">状态变更会写入活动记录，任务内容编辑不会改变状态。</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>编辑任务内容</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <IssueForm

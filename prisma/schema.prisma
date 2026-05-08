@@ -27,7 +27,9 @@ enum ProjectRole {
 enum IssueStatus {
   TODO
   IN_PROGRESS
+  REVIEW
   DONE
+  CLOSED
 }
 
 enum IssuePriority {
@@ -112,6 +114,8 @@ model Project {
   description String?
   archived    Boolean   @default(false)
   nextIssueNumber Int    @default(1)
+  defaultDueDays Int?
+  autoJoin    Boolean   @default(false)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members     ProjectMember[]
   issues      Issue[]
