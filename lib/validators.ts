@@ -80,6 +80,14 @@ export const adminUserRoleSchema = z.object({
   systemRole: z.enum(systemRoles),
 });
 
+export const adminCreateUserSchema = z.object({
+  name: z.string().trim().min(1, "请输入姓名").max(80, "姓名过长"),
+  email: z.string().trim().email("邮箱格式不正确").max(160),
+  password: z.string().min(8, "初始密码至少 8 位").max(128),
+  systemRole: z.enum(systemRoles),
+  mustChangePassword: z.boolean(),
+});
+
 export const adminResetPasswordSchema = z.object({
   userId: z.string().min(1),
   newPassword: z.string().min(8, "新密码至少 8 位").max(128),

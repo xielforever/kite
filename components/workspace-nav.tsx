@@ -26,7 +26,7 @@ export function WorkspaceNav({ workspaceSlug }: { workspaceSlug: string }) {
   const current = activeKey(pathname, basePath);
 
   return (
-    <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="工作区菜单">
+    <nav className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto text-sm" aria-label="工作区菜单">
       {items.map((item) => {
         const active = item.key === current;
         const Icon = item.icon;
@@ -36,7 +36,7 @@ export function WorkspaceNav({ workspaceSlug }: { workspaceSlug: string }) {
             href={`${basePath}${item.href}`}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
               active && "bg-primary/10 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.16)] hover:bg-primary/10 hover:text-primary",
             )}
           >

@@ -95,7 +95,9 @@ npm run build
 npm run start
 ```
 
-生产环境至少需要配置：
+推荐首次启动后通过 `/setup` 完成数据库、访问地址、superAdmin、默认工作区和默认项目初始化。初始化会写入 `KITE_ENV_FILE` 指向的环境文件；如果未设置 `KITE_ENV_FILE`，默认写入项目根目录 `.env`。
+
+只有在已有初始化配置或需要手工迁移配置时，才需要直接维护以下运行时变量：
 
 ```env
 DATABASE_URL="postgresql://kite_user:your_password@localhost:5432/kite?schema=public"
@@ -111,7 +113,7 @@ AUTH_URL="http://<server-ip>:3000"
 
 否则认证流程可能把浏览器重定向回访问者本机的 `localhost:3000`。
 
-生成 `AUTH_SECRET`：
+手工维护时可用以下命令生成 `AUTH_SECRET`：
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -154,6 +156,31 @@ sudo bash scripts/restart-kite.sh
 ```bash
 sudo systemctl restart kite
 ```
+
+## Docker Compose 部署
+
+项目提供 Docker Compose 部署方式，只启动 Kite 应用容器。PostgreSQL 需要提前手动创建数据库和账号，连接信息在 `/setup` 页面填写，不在 Compose 环境变量中预置。
+
+```bash
+cd deploy/docker-compose
+cp .env.example .env
+mkdir -p data
+docker compose up -d --build
+```
+
+首次启动后访问：
+
+```text
+http://<server>:3000/setup
+```
+
+完成页面初始化后重启应用容器：
+
+```bash
+docker compose restart app
+```
+
+详细步骤见 [deploy/docker-compose/README.md](deploy/docker-compose/README.md)。
 
 ## 权限模型
 

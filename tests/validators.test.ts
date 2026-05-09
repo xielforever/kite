@@ -11,6 +11,7 @@ import {
   issueSchema,
   issueMoveSchema,
   commentSchema,
+  adminCreateUserSchema,
 } from "@/lib/validators";
 
 describe("registerSchema", () => {
@@ -164,5 +165,27 @@ describe("commentSchema", () => {
   });
   it("rejects whitespace-only comment", () => {
     expect(commentSchema.safeParse({ body: "   " }).success).toBe(false);
+  });
+});
+
+describe("adminCreateUserSchema", () => {
+  it("accepts valid admin-created users", () => {
+    expect(adminCreateUserSchema.safeParse({
+      name: "杨逍",
+      email: "yangxiao@example.com",
+      password: "password123",
+      systemRole: "USER",
+      mustChangePassword: true,
+    }).success).toBe(true);
+  });
+
+  it("rejects short initial passwords", () => {
+    expect(adminCreateUserSchema.safeParse({
+      name: "杨逍",
+      email: "yangxiao@example.com",
+      password: "short",
+      systemRole: "USER",
+      mustChangePassword: true,
+    }).success).toBe(false);
   });
 });

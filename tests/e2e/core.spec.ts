@@ -112,13 +112,35 @@ test("promoted user can access system admin without signing out", async ({ page,
 
   const adminRow = adminPage.locator("tr", { hasText: "outsider@example.com" });
   await adminRow.locator('select[name="systemRole"]').selectOption("SUPER_ADMIN");
-  await adminRow.locator("form").first().locator("button").click();
   await expect(adminRow.locator('select[name="systemRole"]')).toHaveValue("SUPER_ADMIN");
+  await expect(adminRow.getByText("全局管理权限")).toBeVisible();
   await adminContext.close();
 
   const response = await page.goto("/admin");
   expect(response?.status()).toBe(200);
   await expect(page.locator('select[name="systemRole"]').first()).toBeVisible();
+});
+
+test("super admin can create a user from system admin", async ({ page, browser }) => {
+  execSync("npx tsx scripts/seed-demo.ts", { cwd: process.cwd(), stdio: "ignore" });
+
+  await login(page, "owner@example.com", "plane");
+  await expect(page).toHaveURL(/\/workspaces/);
+  await page.goto("/admin");
+
+  await page.getByRole("button", { name: "新增用户" }).click();
+  await page.locator('input[name="name"]').fill("杨逍");
+  await page.locator('input[name="email"]').fill("yangxiao@example.com");
+  await page.locator('input[name="password"]').fill("password123");
+  await page.getByRole("button", { name: "创建用户" }).click();
+
+  await expect(page.locator("tr", { hasText: "yangxiao@example.com" })).toBeVisible();
+
+  const userContext = await browser.newContext();
+  const userPage = await userContext.newPage();
+  await login(userPage, "yangxiao@example.com", "password123");
+  await expect(userPage).toHaveURL(/\/setup\/change-password/);
+  await userContext.close();
 });
 
 test("non-admin cannot access system admin", async ({ page }) => {

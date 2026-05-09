@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, SlidersHorizontal } from "lucide-react";
+import { LogOut, SlidersHorizontal, UserRound } from "lucide-react";
 import { logoutAction } from "@/lib/actions";
 import { auth } from "@/lib/auth";
 import { enforcePasswordReset } from "@/lib/password-guard";
@@ -50,7 +50,7 @@ export async function AppShell({
           <div className="flex min-w-0 items-center gap-2">
             <ThemeToggle />
             {isSystemAdmin ? (
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
                 <Link href="/admin" title="系统后台">
                   <SlidersHorizontal className="h-4 w-4" />
                   <span className="hidden sm:inline">后台</span>
@@ -59,7 +59,7 @@ export async function AppShell({
             ) : null}
             <Link
               href="/settings/profile"
-              className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted"
+              className="hidden min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted sm:flex"
               title={`当前账号：${email}`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
@@ -70,12 +70,45 @@ export async function AppShell({
                 <span className="block max-w-44 truncate text-xs text-muted-foreground">{email}</span>
               </span>
             </Link>
-            <form action={logoutAction}>
+            <form action={logoutAction} className="hidden sm:block">
               <Button variant="ghost" size="sm" title="退出登录">
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">退出</span>
               </Button>
             </form>
+            <details className="group relative sm:hidden">
+              <summary
+                className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md border bg-background text-xs font-semibold text-primary shadow-sm transition hover:bg-muted"
+                title={`当前账号：${email}`}
+                aria-label="打开账号菜单"
+              >
+                {userInitial(currentUser?.name, currentUser?.email)}
+              </summary>
+              <div className="fixed right-4 top-14 z-30 w-56 rounded-md border bg-card p-2 shadow-lg">
+                <div className="border-b px-2 py-2">
+                  <p className="truncate text-sm font-medium">{displayName}</p>
+                  <p className="truncate text-xs text-muted-foreground">{email}</p>
+                </div>
+                <div className="grid gap-1 py-2">
+                  <Link href="/settings/profile" className="flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted">
+                    <UserRound className="h-4 w-4" />
+                    个人资料
+                  </Link>
+                  {isSystemAdmin ? (
+                    <Link href="/admin" className="flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      系统后台
+                    </Link>
+                  ) : null}
+                </div>
+                <form action={logoutAction} className="border-t pt-2">
+                  <Button variant="ghost" size="sm" className="w-full justify-start">
+                    <LogOut className="h-4 w-4" />
+                    退出登录
+                  </Button>
+                </form>
+              </div>
+            </details>
           </div>
         </div>
       </header>

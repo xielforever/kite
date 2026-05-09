@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+.npm-cache
+coverage
+dist
+test-results
+playwright-report
+*.tsbuildinfo
+.env
+.env*.local
+.next-dev*.log
+.next-start*.log
+deploy/docker-compose/data

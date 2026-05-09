@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, FolderKanban, Users } from "lucide-react";
+import { ArrowRight, Building2, FolderKanban, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { createWorkspaceAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
@@ -102,9 +102,9 @@ export default async function WorkspacesPage() {
               <h2 className="text-base font-semibold">空间列表</h2>
               <p className="text-sm text-muted-foreground">{workspaceCards.length ? `共 ${workspaceCards.length} 个工作区` : "暂无可访问工作区"}</p>
             </div>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" aria-label="刷新工作区目录">
               <Link href="/workspaces">
-                <FolderKanban className="h-4 w-4" />
+                <RefreshCw className="h-4 w-4" />
                 刷新目录
               </Link>
             </Button>
@@ -126,8 +126,14 @@ export default async function WorkspacesPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="truncate text-base font-semibold">{workspace.name}</h3>
-                          <Badge>{workspace.viaSystemAdmin ? "系统管理" : "项目访问"}</Badge>
-                          {workspace.viaSystemAdmin ? <Badge className="border-primary/30 bg-primary/5 text-primary">系统管理</Badge> : null}
+                          <Badge className={workspace.viaSystemAdmin ? "border-primary/30 bg-primary/5 text-primary" : ""}>
+                            {workspace.viaSystemAdmin ? (
+                              <>
+                                <ShieldCheck className="mr-1 h-3 w-3" />
+                                全局可见
+                              </>
+                            ) : "项目授权"}
+                          </Badge>
                         </div>
                         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span>/w/{workspace.slug}</span>

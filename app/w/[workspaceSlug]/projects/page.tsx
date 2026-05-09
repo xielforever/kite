@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, CalendarClock, KanbanSquare, LayoutList, ListTodo } from "lucide-react";
+import { Archive, CalendarClock, KanbanSquare, LayoutList, ListTodo, MoreHorizontal } from "lucide-react";
 import { archiveProjectAction } from "@/lib/actions";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspace } from "@/lib/permissions";
@@ -60,6 +60,12 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
   const closedIssues = projects.reduce((sum, p) => sum + (issueCounts[`${p.id}:CLOSED`] ?? 0), 0);
   const openIssues = totalIssues - doneIssues - closedIssues;
   const uniqueMembers = new Set(projects.flatMap((project) => project.members.map((member) => member.userId))).size;
+  const managedProjectCount = projects.filter((project) => {
+    const projectMembership = project.members.find((member) => member.userId === user.id);
+    return isSystemAdmin || canManageProject(projectMembership?.role);
+  }).length;
+  const missingDefaultDueProjectCount = projects.filter((project) => !project.defaultDueDays).length;
+  const reviewProjectCount = projects.filter((project) => (issueCounts[`${project.id}:REVIEW`] ?? 0) > 0).length;
 
   return (
     <AppShell title="项目" subtitle={`${workspace.name} · ${isSystemAdmin ? "系统管理视图" : "项目成员视图"}`} workspaceSlug={workspaceSlug}>
@@ -71,7 +77,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
               项目台账
             </div>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              用于快速判断项目规模、任务完成度和负责人范围。进入看板处理流转，进入列表做筛选和批量浏览。
+              当前共有 {projects.length} 个活跃项目、{openIssues} 项流转中任务，涉及 {uniqueMembers} 名成员，其中 {reviewIssues} 项任务待评审。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -90,16 +96,16 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             <p className="mt-1 text-2xl font-semibold">{projects.length}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">流转中任务</p>
-            <p className="mt-1 text-2xl font-semibold">{openIssues}</p>
+            <p className="text-xs text-muted-foreground">可管理项目</p>
+            <p className="mt-1 text-2xl font-semibold">{managedProjectCount}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">涉及成员</p>
-            <p className="mt-1 text-2xl font-semibold">{uniqueMembers}</p>
+            <p className="text-xs text-muted-foreground">默认截止未设置</p>
+            <p className={missingDefaultDueProjectCount ? "mt-1 text-2xl font-semibold text-amber-600 dark:text-amber-400" : "mt-1 text-2xl font-semibold"}>{missingDefaultDueProjectCount}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">待评审 / 已关闭</p>
-            <p className="mt-1 text-2xl font-semibold">{reviewIssues} / {closedIssues}</p>
+            <p className="text-xs text-muted-foreground">含待评审项目</p>
+            <p className="mt-1 text-2xl font-semibold">{reviewProjectCount}</p>
           </div>
         </div>
       </section>
@@ -152,34 +158,42 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <Button asChild size="sm">
-                          <Link href={`/w/${workspaceSlug}/projects/${project.key}/board`}>
-                            <KanbanSquare className="h-4 w-4" />
-                            看板
-                          </Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/w/${workspaceSlug}/projects/${project.key}/issues`}>
-                            <LayoutList className="h-4 w-4" />
-                            列表
-                          </Link>
-                        </Button>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild size="sm">
+                            <Link href={`/w/${workspaceSlug}/projects/${project.key}/board`}>
+                              <KanbanSquare className="h-4 w-4" />
+                              看板
+                            </Link>
+                          </Button>
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/w/${workspaceSlug}/projects/${project.key}/issues`}>
+                              <LayoutList className="h-4 w-4" />
+                              列表
+                            </Link>
+                          </Button>
+                        </div>
                         {canManage ? (
-                          <ProjectSettingsDialog workspaceSlug={workspaceSlug} project={project} />
-                        ) : null}
-                        {canManage ? (
-                          <form
-                            action={async () => {
-                              "use server";
-                              await archiveProjectAction(workspaceSlug, project.key);
-                            }}
-                          >
-                            <ConfirmSubmitButton size="sm" variant="ghost" message="确定归档这个项目？归档后可在归档页恢复。">
-                              <Archive className="h-4 w-4" />
-                              归档
-                            </ConfirmSubmitButton>
-                          </form>
+                          <details className="group relative">
+                            <summary className="inline-flex h-8 cursor-pointer list-none items-center justify-center gap-2 rounded-md border bg-background px-2.5 text-xs font-medium transition hover:bg-muted">
+                              <MoreHorizontal className="h-4 w-4" />
+                              更多
+                            </summary>
+                            <div className="absolute right-0 z-20 mt-2 w-36 rounded-md border bg-card p-1.5 shadow-lg">
+                              <ProjectSettingsDialog workspaceSlug={workspaceSlug} project={project} triggerClassName="w-full justify-start" />
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await archiveProjectAction(workspaceSlug, project.key);
+                                }}
+                              >
+                                <ConfirmSubmitButton size="sm" variant="ghost" className="w-full justify-start" message="确定归档这个项目？归档后可在归档页恢复。">
+                                  <Archive className="h-4 w-4" />
+                                  归档
+                                </ConfirmSubmitButton>
+                              </form>
+                            </div>
+                          </details>
                         ) : null}
                       </div>
                     </div>

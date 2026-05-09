@@ -126,62 +126,77 @@ export function ProjectMemberPanel({
   const [email, setEmail] = useState("");
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        {members.map((member) => (
-          <div key={member.id} className="rounded-md border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">{member.user.name}</p>
-                <p className="text-xs text-muted-foreground">{member.user.email}</p>
+    <div className="space-y-5">
+      <section className="rounded-md border bg-muted/30">
+        <div className="flex items-center justify-between gap-3 border-b px-3 py-2.5">
+          <div>
+            <h3 className="text-sm font-semibold">现有成员</h3>
+            <p className="text-xs text-muted-foreground">共 {members.length} 人</p>
+          </div>
+          <Badge>{canManage ? "可管理" : "只读"}</Badge>
+        </div>
+        <div className="max-h-80 space-y-3 overflow-y-auto p-3">
+          {members.map((member) => (
+            <div key={member.id} className="rounded-md border bg-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">{member.user.name}</p>
+                  <p className="text-xs text-muted-foreground">{member.user.email}</p>
+                </div>
+                {canManage ? (
+                  <form
+                    action={updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id)}
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的项目角色`}>
+                      {projectRoles.map((role) => (
+                        <option key={role} value={role}>
+                          {projectRoleLabels[role]}
+                        </option>
+                      ))}
+                    </select>
+                    <Button size="sm" variant="outline">
+                      保存
+                    </Button>
+                  </form>
+                ) : (
+                  <Badge>{projectRoleLabels[member.role]}</Badge>
+                )}
               </div>
               {canManage ? (
                 <form
-                  action={updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id)}
-                  className="flex items-center gap-2"
+                  action={removeProjectMemberAction.bind(null, workspaceSlug, projectKey, member.id)}
+                  className="mt-3"
                 >
-                  <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的项目角色`}>
-                    {projectRoles.map((role) => (
-                      <option key={role} value={role}>
-                        {projectRoleLabels[role]}
-                      </option>
-                    ))}
-                  </select>
-                  <Button size="sm" variant="outline">
-                    保存
-                  </Button>
+                  <ConfirmSubmitButton size="sm" variant="ghost" message="确定移除该项目成员？">
+                    移除
+                  </ConfirmSubmitButton>
                 </form>
-              ) : (
-                <Badge>{projectRoleLabels[member.role]}</Badge>
-              )}
+              ) : null}
             </div>
-            {canManage ? (
-              <form
-                action={removeProjectMemberAction.bind(null, workspaceSlug, projectKey, member.id)}
-                className="mt-3"
-              >
-                <ConfirmSubmitButton size="sm" variant="ghost" message="确定移除该项目成员？">
-                  移除
-                </ConfirmSubmitButton>
-              </form>
-            ) : null}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
       {canManage ? (
-        <ActionForm action={addProjectMember} submitLabel="添加项目成员" onSuccess={() => setEmail("")}>
-          <MemberEmailSearch workspaceSlug={workspaceSlug} projectKey={projectKey} value={email} onChange={setEmail} />
-          <div className="space-y-2">
-            <Label htmlFor="project-member-role">项目角色</Label>
-            <select id="project-member-role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
-              {projectRoles.map((role) => (
-                <option key={role} value={role}>
-                  {projectRoleLabels[role]}
-                </option>
-              ))}
-            </select>
+        <section className="rounded-md border bg-card p-3">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold">添加成员</h3>
+            <p className="text-xs text-muted-foreground">通过姓名或邮箱搜索已注册用户。</p>
           </div>
-        </ActionForm>
+          <ActionForm action={addProjectMember} submitLabel="添加项目成员" onSuccess={() => setEmail("")}>
+            <MemberEmailSearch workspaceSlug={workspaceSlug} projectKey={projectKey} value={email} onChange={setEmail} />
+            <div className="space-y-2">
+              <Label htmlFor="project-member-role">项目角色</Label>
+              <select id="project-member-role" name="role" defaultValue="MEMBER" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+                {projectRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {projectRoleLabels[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </ActionForm>
+        </section>
       ) : null}
     </div>
   );

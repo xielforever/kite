@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Building2, Download, FolderKanban, KeyRound, ShieldCheck, Users } from "lucide-react";
-import { projectRoleLabels, systemRoleLabels, systemRoles, type ProjectRoleValue } from "@/lib/constants";
-import { adminUpdateUserRoleAction, adminResetPasswordAction } from "@/lib/actions";
+import { projectRoleLabels, type ProjectRoleValue } from "@/lib/constants";
+import { adminResetPasswordAction } from "@/lib/actions";
 import { ActionForm } from "@/components/action-form";
+import { AdminCreateUserDialog } from "@/components/admin-create-user-dialog";
+import { AdminRoleSelect } from "@/components/admin-role-select";
 import { Badge } from "@/components/ui/badge";
 
 type ProjectMembershipSummary = {
@@ -80,8 +82,27 @@ function ProjectPermissionBadges({
   );
 }
 
+function ResetPasswordControl({ user, inline = false }: { user: { id: string; name: string }; inline?: boolean }) {
+  return (
+    <details className={inline ? "group w-full" : "group relative inline-block"}>
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary">
+        <KeyRound className="h-3.5 w-3.5" />
+        重置密码
+      </summary>
+      <div className={inline ? "mt-2 rounded-md border bg-card p-3" : "absolute right-0 z-10 mt-2 rounded-md border bg-card p-3 shadow-lg"}>
+        <ActionForm action={adminResetPasswordAction} submitLabel="重置" pendingLabel="重置中..." className="space-y-3">
+          <input type="hidden" name="userId" value={user.id} />
+          <div className="flex items-center gap-2">
+            <Input name="newPassword" type="password" placeholder="新密码（至少8位）" className={inline ? "h-8 text-xs" : "h-8 w-44 text-xs"} aria-label={`重置 ${user.name} 的密码`} required />
+          </div>
+        </ActionForm>
+      </div>
+    </details>
+  );
+}
+
 export default async function AdminPage() {
-  await requireSystemAdmin();
+  const adminUser = await requireSystemAdmin();
 
   const [userCount, workspaceCount, projectCount, recentUsers] = await Promise.all([
     prisma.user.count(),
@@ -143,11 +164,11 @@ export default async function AdminPage() {
         </Card>
       </div>
 
-      <Card className="mt-6 overflow-hidden">
+      <Card className="mt-6 overflow-hidden" aria-labelledby="admin-users-title">
         <CardHeader className="border-b bg-muted/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <CardTitle>用户管理</CardTitle>
+              <CardTitle id="admin-users-title">用户管理</CardTitle>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge className="border-primary/25 bg-primary/5 text-primary">
                   系统管理员 {systemAdminCount}
@@ -160,24 +181,28 @@ export default async function AdminPage() {
                 </Badge>
               </div>
             </div>
-            <Button asChild variant="outline" size="sm" className="shrink-0 bg-background">
-              <Link href="/api/admin/exports/issues">
-                <Download className="h-4 w-4" />
-                导出项目任务
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <AdminCreateUserDialog />
+              <Button asChild variant="outline" size="sm" className="shrink-0 bg-background">
+                <Link href="/api/admin/exports/issues">
+                  <Download className="h-4 w-4" />
+                  导出项目任务
+                </Link>
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1180px] table-fixed text-sm">
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="min-w-[1210px] table-fixed text-sm">
+              <caption className="sr-only">系统后台用户管理列表，可创建用户、调整系统角色、查看项目权限并重置密码。</caption>
               <colgroup>
-                <col className="w-[220px]" />
-                <col className="w-[260px]" />
-                <col className="w-[220px]" />
-                <col className="w-[360px]" />
-                <col className="w-[130px]" />
                 <col className="w-[190px]" />
+                <col className="w-[220px]" />
+                <col className="w-[250px]" />
+                <col className="w-[300px]" />
+                <col className="w-[110px]" />
+                <col className="w-[140px]" />
               </colgroup>
               <thead className="bg-background/95">
                 <tr className="border-b text-left text-xs uppercase text-muted-foreground">
@@ -210,19 +235,12 @@ export default async function AdminPage() {
                     </td>
                     <td className="break-all px-5 py-4 align-top text-muted-foreground">{user.email}</td>
                     <td className="px-5 py-4 align-top">
-                      <ActionForm action={adminUpdateUserRoleAction} submitLabel="保存" pendingLabel="保存中..." className="flex flex-wrap items-center gap-2 [&>button]:h-8 [&>button]:px-3 [&>button]:text-xs [&>p]:basis-full [&>p]:py-1.5 [&>p]:text-xs">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <select
-                          name="systemRole"
-                          defaultValue={user.systemRole}
-                          className="h-8 w-28 rounded-md border bg-background px-2 text-xs font-medium shadow-sm"
-                          aria-label={`修改 ${user.name} 的系统角色`}
-                        >
-                          {systemRoles.map((role) => (
-                            <option key={role} value={role}>{systemRoleLabels[role]}</option>
-                          ))}
-                        </select>
-                      </ActionForm>
+                      <AdminRoleSelect
+                        userId={user.id}
+                        userName={user.name}
+                        value={user.systemRole}
+                        disabled={user.id === adminUser.id}
+                      />
                     </td>
                     <td className="px-5 py-4 align-top">
                       <ProjectPermissionBadges
@@ -231,37 +249,67 @@ export default async function AdminPage() {
                       />
                     </td>
                     <td className="px-5 py-4 align-top text-muted-foreground">
-                      {user.createdAt.toLocaleDateString("zh-CN")}
+                      <time dateTime={user.createdAt.toISOString()}>{user.createdAt.toLocaleDateString("zh-CN")}</time>
                     </td>
                     <td className="px-5 py-4 align-top">
-                      <details className="group relative inline-block">
-                        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary">
-                          <KeyRound className="h-3.5 w-3.5" />
-                          重置密码
-                        </summary>
-                        <div className="absolute right-0 z-10 mt-2 rounded-md border bg-card p-3 shadow-lg">
-                          <ActionForm action={adminResetPasswordAction} submitLabel="重置" pendingLabel="重置中..." className="space-y-3">
-                            <input type="hidden" name="userId" value={user.id} />
-                            <div className="flex items-center gap-2">
-                              <Input name="newPassword" type="password" placeholder="新密码（至少8位）" className="h-8 w-44 text-xs" aria-label={`重置 ${user.name} 的密码`} required />
-                            </div>
-                          </ActionForm>
-                        </div>
-                      </details>
+                      <ResetPasswordControl user={user} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <div className="divide-y lg:hidden">
+            {recentUsers.map((user) => (
+              <article key={user.id} className="space-y-4 bg-card p-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-background text-sm font-semibold text-primary shadow-sm">
+                    {userInitial(user.name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-medium" title={user.name}>{user.name}</h3>
+                      {user.mustChangePassword ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-700 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
+                          <KeyRound className="h-3 w-3" />
+                          待改密
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 break-all text-sm text-muted-foreground">{user.email}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      注册于 <time dateTime={user.createdAt.toISOString()}>{user.createdAt.toLocaleDateString("zh-CN")}</time>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 rounded-md border bg-background p-3">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">系统角色</p>
+                    <AdminRoleSelect
+                      userId={user.id}
+                      userName={user.name}
+                      value={user.systemRole}
+                      disabled={user.id === adminUser.id}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">项目权限</p>
+                    <ProjectPermissionBadges
+                      memberships={user.projectMemberships}
+                      isSystemAdmin={user.systemRole === "SUPER_ADMIN"}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <ResetPasswordControl user={user} inline />
+                </div>
+              </article>
+            ))}
+          </div>
         </CardContent>
       </Card>
-
-      <div className="mt-4">
-        <Button asChild variant="outline">
-          <Link href="/workspaces">返回工作区</Link>
-        </Button>
-      </div>
     </AppShell>
   );
 }

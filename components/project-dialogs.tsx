@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, Settings, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { IssueForm } from "@/components/issue-form";
 import { ProjectEditForm } from "@/components/project-edit-form";
 import { ProjectForm } from "@/components/project-form";
@@ -107,15 +107,21 @@ export function ProjectMemberDialog({
 export function ProjectSettingsDialog({
   workspaceSlug,
   project,
+  triggerClassName,
+  triggerVariant = "ghost",
+  triggerSize = "sm",
 }: {
   workspaceSlug: string;
   project: { id: string; name: string; key: string; description?: string | null; defaultDueDays?: number | null };
+  triggerClassName?: string;
+  triggerVariant?: ButtonProps["variant"];
+  triggerSize?: ButtonProps["size"];
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button onClick={() => setOpen(true)} size="sm" variant="ghost">
+      <Button onClick={() => setOpen(true)} size={triggerSize} variant={triggerVariant} className={triggerClassName}>
         <Settings className="h-4 w-4" />
         设置
       </Button>

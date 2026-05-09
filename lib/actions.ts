@@ -21,6 +21,7 @@ import { canCreateWorkspace } from "@/lib/role-rules";
 import { projectKey, slugifyAscii } from "@/lib/utils";
 import {
   adminResetPasswordSchema,
+  adminCreateUserSchema,
   adminUserRoleSchema,
   commentSchema,
   issueMoveSchema,
@@ -725,6 +726,48 @@ export async function forceChangePasswordAction(_state: ActionState, formData: F
   const result = await updatePasswordAction(_state, formData);
   if (result.error) return result;
   redirect("/workspaces");
+}
+
+export async function adminCreateUserAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireSystemAdmin();
+  const parsed = adminCreateUserSchema.safeParse({
+    name: formValue(formData, "name"),
+    email: formValue(formData, "email").toLowerCase(),
+    password: formValue(formData, "password"),
+    systemRole: formValue(formData, "systemRole") || "USER",
+    mustChangePassword: formData.get("mustChangePassword") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message };
+
+  try {
+    const passwordHash = await hash(parsed.data.password, 12);
+    const created = await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash,
+        systemRole: parsed.data.systemRole,
+        mustChangePassword: parsed.data.mustChangePassword,
+      },
+      select: { id: true },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "ADMIN_CREATE_USER",
+        targetId: created.id,
+        detail: parsed.data.systemRole,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { error: "该邮箱已注册" };
+    }
+    return actionError(error);
+  }
+
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 export async function adminUpdateUserRoleAction(_state: ActionState, formData: FormData): Promise<ActionState> {

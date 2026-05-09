@@ -9,6 +9,14 @@ import { IssueCard, type IssueCardData } from "@/components/issue-card";
 
 type BoardIssue = IssueCardData & { sortOrder: number };
 
+const columnHints: Record<IssueStatusValue, string> = {
+  TODO: "已登记，尚未开始",
+  IN_PROGRESS: "正在处理",
+  REVIEW: "等待确认",
+  DONE: "已完成交付",
+  CLOSED: "不再继续处理",
+};
+
 function SortableIssue({
   issue,
   href,
@@ -63,6 +71,16 @@ export function IssueBoard({
     acc[status] = localIssues.filter((issue) => issue.status === status);
     return acc;
   }, {} as Record<IssueStatusValue, BoardIssue[]>), [localIssues]);
+  const boardStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      total: localIssues.length,
+      active: localIssues.filter((issue) => !["DONE", "CLOSED"].includes(issue.status)).length,
+      overdue: localIssues.filter((issue) => issue.dueDate && new Date(issue.dueDate) < today && !["DONE", "CLOSED"].includes(issue.status)).length,
+      unassigned: localIssues.filter((issue) => !issue.assignee && !["DONE", "CLOSED"].includes(issue.status)).length,
+    };
+  }, [localIssues]);
 
   async function onDragEnd(event: DragEndEvent) {
     if (!canMove) return;
@@ -107,6 +125,24 @@ export function IssueBoard({
           </div>
         ) : null}
       </div>
+      <div className="mb-4 grid gap-px overflow-hidden rounded-lg border bg-border text-sm sm:grid-cols-4">
+        <div className="bg-card p-3">
+          <p className="text-xs text-muted-foreground">当前任务</p>
+          <p className="mt-1 text-lg font-semibold">{boardStats.total}</p>
+        </div>
+        <div className="bg-card p-3">
+          <p className="text-xs text-muted-foreground">流转中</p>
+          <p className="mt-1 text-lg font-semibold">{boardStats.active}</p>
+        </div>
+        <div className="bg-card p-3">
+          <p className="text-xs text-muted-foreground">已逾期</p>
+          <p className={boardStats.overdue ? "mt-1 text-lg font-semibold text-destructive" : "mt-1 text-lg font-semibold"}>{boardStats.overdue}</p>
+        </div>
+        <div className="bg-card p-3">
+          <p className="text-xs text-muted-foreground">未分配</p>
+          <p className={boardStats.unassigned ? "mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400" : "mt-1 text-lg font-semibold"}>{boardStats.unassigned}</p>
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {statusColumns.map((status) => (
           <BoardColumn
@@ -140,9 +176,12 @@ function BoardColumn({
 
   return (
     <div ref={setNodeRef} className={isOver ? "rounded-lg border border-primary bg-primary/5 p-3" : "rounded-lg border bg-muted/40 p-3"}>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{statusLabels[status]}</h2>
-        <span className="text-xs text-muted-foreground">{issues.length}</span>
+      <div className="mb-3 space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">{statusLabels[status]}</h2>
+          <span className="rounded-md border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{issues.length}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{columnHints[status]}</p>
       </div>
       <SortableContext items={issues.map((issue) => issue.id)} strategy={verticalListSortingStrategy}>
         <div className="min-h-40 space-y-3">

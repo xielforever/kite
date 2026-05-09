@@ -9,6 +9,7 @@ import { KiteLogo } from "@/components/kite-logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import packageJson from "@/package.json";
 
 export default async function LoginPage({
   searchParams,
@@ -30,7 +31,7 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <KiteLogo size={34} className="mb-2" />
@@ -60,6 +61,10 @@ export default async function LoginPage({
               注册
             </Link>
           </p>
+          <div className="mt-5 border-t pt-4 text-xs leading-5 text-muted-foreground">
+            <p>Kite v{packageJson.version} · 私有部署</p>
+            <p>项目权限由项目负责人或系统管理员维护。</p>
+          </div>
         </CardContent>
       </Card>
     </main>
