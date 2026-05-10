@@ -45,7 +45,7 @@ export async function AppShell({
             <Link href="/workspaces" className="text-sm">
               <KiteLogo size={26} />
             </Link>
-            {workspaceSlug ? <WorkspaceNav workspaceSlug={workspaceSlug} /> : null}
+            {workspaceSlug ? <WorkspaceNav workspaceSlug={workspaceSlug} showSettings={Boolean(isSystemAdmin)} /> : null}
           </div>
           <div className="flex min-w-0 items-center gap-2">
             <ThemeToggle />

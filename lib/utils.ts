@@ -26,11 +26,21 @@ export function slugifyAscii(value: string) {
 }
 
 export function projectKey(value: string) {
-  return value
+  const normalized = value
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "")
     .slice(0, 8);
+  if (normalized) return normalized;
+
+  const compact = value.trim();
+  if (!compact) return "";
+
+  let hash = 0;
+  for (const char of compact) {
+    hash = (hash * 31 + char.codePointAt(0)!) % 1_679_616;
+  }
+  return `P${hash.toString(36).toUpperCase().padStart(4, "0")}`.slice(0, 8);
 }
 
 export function formatDate(value?: Date | string | null) {

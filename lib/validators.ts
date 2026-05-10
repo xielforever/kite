@@ -71,6 +71,35 @@ export const issueMoveSchema = z.object({
   overIssueId: z.string().optional(),
 });
 
+export type SanitizedIssueFilters = {
+  q?: string;
+  status?: (typeof issueStatuses)[number];
+  priority?: (typeof issuePriorities)[number];
+  assignee?: string;
+  page: number;
+};
+
+export function sanitizeIssueFilters(input: {
+  q?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  assignee?: string | null;
+  page?: string | number | null;
+}): SanitizedIssueFilters {
+  const q = input.q?.trim().slice(0, 120) || undefined;
+  const status = issueStatuses.includes(input.status as (typeof issueStatuses)[number])
+    ? (input.status as (typeof issueStatuses)[number])
+    : undefined;
+  const priority = issuePriorities.includes(input.priority as (typeof issuePriorities)[number])
+    ? (input.priority as (typeof issuePriorities)[number])
+    : undefined;
+  const assignee = input.assignee?.trim().slice(0, 80) || undefined;
+  const rawPage = typeof input.page === "number" ? input.page : Number(input.page);
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+
+  return { q, status, priority, assignee, page };
+}
+
 export const commentSchema = z.object({
   body: z.string().trim().min(1, "请输入评论").max(3000),
 });

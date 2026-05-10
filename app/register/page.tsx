@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { registerAction } from "@/lib/actions";
+import { publicRegistrationEnabled } from "@/lib/registration";
 import { ActionForm } from "@/components/action-form";
 import { KiteLogo } from "@/components/kite-logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import packageJson from "@/package.json";
 
 export default function RegisterPage() {
+  if (!publicRegistrationEnabled()) redirect("/login");
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <Card className="w-full max-w-sm">

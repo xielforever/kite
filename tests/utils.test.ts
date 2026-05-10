@@ -10,6 +10,7 @@ describe("utils", () => {
   it("normalizes project keys", () => {
     expect(projectKey("Kite")).toBe("KITE");
     expect(projectKey("ops-123")).toBe("OPS123");
+    expect(projectKey("专项验证")).toMatch(/^P[A-Z0-9]+$/);
   });
 
   it("normalizes workspace slugs for URLs", () => {

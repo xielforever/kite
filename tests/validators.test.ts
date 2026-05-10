@@ -12,6 +12,7 @@ import {
   issueMoveSchema,
   commentSchema,
   adminCreateUserSchema,
+  sanitizeIssueFilters,
 } from "@/lib/validators";
 
 describe("registerSchema", () => {
@@ -153,6 +154,18 @@ describe("issueMoveSchema", () => {
   });
   it("rejects empty issueId", () => {
     expect(issueMoveSchema.safeParse({ issueId: "", status: "DONE" }).success).toBe(false);
+  });
+});
+
+describe("sanitizeIssueFilters", () => {
+  it("ignores invalid enum values and normalizes page", () => {
+    expect(sanitizeIssueFilters({ status: "BAD", priority: "NOPE", page: "abc" })).toEqual({ page: 1 });
+    expect(sanitizeIssueFilters({ status: "REVIEW", priority: "HIGH", assignee: " user-1 ", page: "3" })).toEqual({
+      status: "REVIEW",
+      priority: "HIGH",
+      assignee: "user-1",
+      page: 3,
+    });
   });
 });
 

@@ -5,13 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, Download, FolderKanban, KeyRound, ShieldCheck, Users } from "lucide-react";
+import { Building2, Download, FolderKanban, KeyRound, Search, ShieldCheck, Users } from "lucide-react";
 import { projectRoleLabels, type ProjectRoleValue } from "@/lib/constants";
 import { adminResetPasswordAction } from "@/lib/actions";
 import { ActionForm } from "@/components/action-form";
 import { AdminCreateUserDialog } from "@/components/admin-create-user-dialog";
 import { AdminRoleSelect } from "@/components/admin-role-select";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/pagination";
+
+const ADMIN_USER_PAGE_SIZE = 20;
 
 type ProjectMembershipSummary = {
   role: ProjectRoleValue;
@@ -101,36 +104,57 @@ function ResetPasswordControl({ user, inline = false }: { user: { id: string; na
   );
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
   const adminUser = await requireSystemAdmin();
+  const params = await searchParams;
+  const query = params.q?.trim().slice(0, 120) ?? "";
+  const parsedPage = Number(params.page);
+  const requestedPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const userWhere = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { email: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
 
-  const [userCount, workspaceCount, projectCount, recentUsers] = await Promise.all([
+  const [userCount, workspaceCount, projectCount, systemAdminCount, pendingPasswordCount, projectMemberCount, totalFilteredUsers] = await Promise.all([
     prisma.user.count(),
     prisma.workspace.count(),
     prisma.project.count({ where: { archived: false } }),
-    prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        systemRole: true,
-        mustChangePassword: true,
-        createdAt: true,
-        projectMemberships: {
-          select: {
-            role: true,
-            project: { select: { key: true, name: true, workspace: { select: { name: true } } } },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    }),
+    prisma.user.count({ where: { systemRole: "SUPER_ADMIN" } }),
+    prisma.user.count({ where: { mustChangePassword: true } }),
+    prisma.user.count({ where: { projectMemberships: { some: {} } } }),
+    prisma.user.count({ where: userWhere }),
   ]);
-  const systemAdminCount = recentUsers.filter((user) => user.systemRole === "SUPER_ADMIN").length;
-  const pendingPasswordCount = recentUsers.filter((user) => user.mustChangePassword).length;
-  const projectMemberCount = recentUsers.filter((user) => user.projectMemberships.length > 0).length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredUsers / ADMIN_USER_PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const recentUsers = await prisma.user.findMany({
+    where: userWhere,
+    orderBy: { createdAt: "desc" },
+    skip: (currentPage - 1) * ADMIN_USER_PAGE_SIZE,
+    take: ADMIN_USER_PAGE_SIZE,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      systemRole: true,
+      mustChangePassword: true,
+      createdAt: true,
+      projectMemberships: {
+        select: {
+          role: true,
+          project: { select: { key: true, name: true, workspace: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
 
   return (
     <AppShell title="系统管理" subtitle="系统管理员专属后台">
@@ -182,6 +206,21 @@ export default async function AdminPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <form action="/admin" method="get" className="flex min-w-0 items-center gap-2">
+                <div className="relative min-w-0">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    name="q"
+                    defaultValue={query}
+                    placeholder="搜索姓名或邮箱"
+                    className="h-9 w-56 pl-8 text-sm"
+                    aria-label="搜索用户"
+                  />
+                </div>
+                <Button type="submit" variant="outline" size="sm" className="bg-background">
+                  搜索
+                </Button>
+              </form>
               <AdminCreateUserDialog />
               <Button asChild variant="outline" size="sm" className="shrink-0 bg-background">
                 <Link href="/api/admin/exports/issues">
@@ -193,6 +232,9 @@ export default async function AdminPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="border-b bg-card px-5 py-3 text-sm text-muted-foreground">
+            {query ? `搜索「${query}」：${totalFilteredUsers} 个用户` : `共 ${userCount} 个用户`}，当前第 {currentPage}/{totalPages} 页
+          </div>
           <div className="hidden overflow-x-auto lg:block">
             <table className="min-w-[1210px] table-fixed text-sm">
               <caption className="sr-only">系统后台用户管理列表，可创建用户、调整系统角色、查看项目权限并重置密码。</caption>
@@ -307,6 +349,9 @@ export default async function AdminPage() {
                 </div>
               </article>
             ))}
+          </div>
+          <div className="border-t px-5 py-3">
+            <Pagination total={totalFilteredUsers} pageSize={ADMIN_USER_PAGE_SIZE} currentPage={currentPage} />
           </div>
         </CardContent>
       </Card>

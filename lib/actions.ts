@@ -18,6 +18,7 @@ import {
   requireUser,
 } from "@/lib/permissions";
 import { canCreateWorkspace } from "@/lib/role-rules";
+import { publicRegistrationEnabled } from "@/lib/registration";
 import { projectKey, slugifyAscii } from "@/lib/utils";
 import {
   adminResetPasswordSchema,
@@ -149,6 +150,8 @@ async function uniqueWorkspaceSlug(base: string) {
 }
 
 export async function registerAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  if (!publicRegistrationEnabled()) return { error: "当前部署已关闭公开注册，请联系系统管理员创建账号" };
+
   const parsed = registerSchema.safeParse({
     name: formValue(formData, "name"),
     email: formValue(formData, "email").toLowerCase(),
@@ -551,13 +554,20 @@ export async function moveIssue(input: unknown) {
     if (overIssue) sortOrder = overIssue.sortOrder - 1;
   }
 
+  const statusChanged = issue.status !== status;
+
   await prisma.$transaction([
     prisma.issue.update({
       where: { id: issueId },
       data: { status, sortOrder },
     }),
     prisma.issueActivity.create({
-      data: { issueId, actorId: user.id, action: "移动任务", detail: status },
+      data: {
+        issueId,
+        actorId: user.id,
+        action: statusChanged ? "移动任务" : "调整排序",
+        detail: statusChanged ? `${statusLabels[issue.status]} → ${statusLabels[status]}` : `${statusLabels[status]}内排序调整`,
+      },
     }),
   ]);
   revalidatePath(`/w/${issue.project.workspace.slug}/projects/${issue.project.key}`);
@@ -659,9 +669,14 @@ export async function updateProjectMemberRoleAction(workspaceSlug: string, proje
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
 }
 
-export async function updateProjectMemberRoleFormAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string, formData: FormData) {
+export async function updateProjectMemberRoleFormAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
   const role = String(formData.get("role") ?? "");
-  await updateProjectMemberRoleAction(workspaceSlug, projectKeyValue, projectMemberId, role);
+  try {
+    await updateProjectMemberRoleAction(workspaceSlug, projectKeyValue, projectMemberId, role);
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
 }
 
 export async function removeProjectMemberAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string) {
@@ -674,6 +689,17 @@ export async function removeProjectMemberAction(workspaceSlug: string, projectKe
   }
   await prisma.projectMember.delete({ where: { id: projectMemberId } });
   revalidatePath(`/w/${workspaceSlug}/projects/${projectKeyValue}`);
+}
+
+export async function removeProjectMemberFormAction(workspaceSlug: string, projectKeyValue: string, projectMemberId: string, _state: ActionState, _formData: FormData): Promise<ActionState> {
+  void _state;
+  void _formData;
+  try {
+    await removeProjectMemberAction(workspaceSlug, projectKeyValue, projectMemberId);
+    return { ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
 }
 
 export async function updateProfileAction(_state: ActionState, formData: FormData): Promise<ActionState> {

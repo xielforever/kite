@@ -20,14 +20,15 @@ function activeKey(pathname: string, basePath: string) {
   return "";
 }
 
-export function WorkspaceNav({ workspaceSlug }: { workspaceSlug: string }) {
+export function WorkspaceNav({ workspaceSlug, showSettings }: { workspaceSlug: string; showSettings: boolean }) {
   const pathname = usePathname();
   const basePath = `/w/${workspaceSlug}`;
   const current = activeKey(pathname, basePath);
+  const visibleItems = showSettings ? items : items.filter((item) => item.key !== "settings");
 
   return (
     <nav className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto text-sm" aria-label="工作区菜单">
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const active = item.key === current;
         const Icon = item.icon;
         return (

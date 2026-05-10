@@ -17,7 +17,7 @@ export default async function ProjectIssuesPage({
 }) {
   const { workspaceSlug, projectKey } = await params;
   const filters = await searchParams;
-  const { user, workspace, project, members, issues, totalIssues, page, pageSize, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, { ...filters, page: filters.page ? parseInt(filters.page, 10) : undefined });
+  const { user, workspace, project, members, issues, totalIssues, page, pageSize, canEditProject, canManageProject } = await getProjectPageData(workspaceSlug, projectKey, filters);
   const memberOptions = members.map((member) => ({ id: member.user.id, name: member.user.name, email: member.user.email }));
 
   return (

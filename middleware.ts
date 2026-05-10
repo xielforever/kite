@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import NextAuth from "next-auth";
 import { edgeAuthConfig } from "@/lib/auth";
+import { publicRegistrationEnabled } from "@/lib/registration";
 
 const { auth } = NextAuth(edgeAuthConfig);
 
-const publicRoutes = ["/login", "/register"];
+const publicRoutes = ["/login"];
 
 function redirectToLogin(req: Parameters<Parameters<typeof auth>[0]>[0]) {
   const url = new URL("/login", req.nextUrl.origin);
@@ -26,8 +27,18 @@ function redirectToLogin(req: Parameters<Parameters<typeof auth>[0]>[0]) {
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isPublic = pathname === "/" || pathname === "/setup" || publicRoutes.some((route) => pathname.startsWith(route));
+  const registrationEnabled = publicRegistrationEnabled();
+  const isRegisterRoute = pathname.startsWith("/register");
+  const isPublic =
+    pathname === "/" ||
+    pathname === "/setup" ||
+    publicRoutes.some((route) => pathname.startsWith(route)) ||
+    (registrationEnabled && isRegisterRoute);
   const hasValidSession = Boolean(req.auth?.user?.id);
+
+  if (!registrationEnabled && isRegisterRoute) {
+    return NextResponse.redirect(new URL("/login", req.nextUrl.origin));
+  }
 
   if (!hasValidSession && !isPublic) {
     return redirectToLogin(req);

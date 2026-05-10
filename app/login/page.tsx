@@ -4,6 +4,7 @@ import { loginAction } from "@/lib/actions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSetupStatus } from "@/lib/setup";
+import { publicRegistrationEnabled } from "@/lib/registration";
 import { ActionForm } from "@/components/action-form";
 import { KiteLogo } from "@/components/kite-logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,12 +56,14 @@ export default async function LoginPage({
               <Input id="password" name="password" type="password" autoComplete="current-password" required />
             </div>
           </ActionForm>
-          <p className="mt-4 text-sm text-muted-foreground">
-            还没有账号？{" "}
-            <Link href="/register" className="font-medium text-primary">
-              注册
-            </Link>
-          </p>
+          {publicRegistrationEnabled() ? (
+            <p className="mt-4 text-sm text-muted-foreground">
+              还没有账号？{" "}
+              <Link href="/register" className="font-medium text-primary">
+                注册
+              </Link>
+            </p>
+          ) : null}
           <div className="mt-5 border-t pt-4 text-xs leading-5 text-muted-foreground">
             <p>Kite v{packageJson.version} · 私有部署</p>
             <p>项目权限由项目负责人或系统管理员维护。</p>

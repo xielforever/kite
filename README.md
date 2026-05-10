@@ -85,6 +85,12 @@ npm run clear-db
 
 `reset-db` 会清空业务数据并创建默认管理员，仅适合本地开发或可丢弃环境。`seed:demo` 用于写入演示数据。
 
+默认关闭公开注册，系统管理员可在后台新增用户。如确需允许用户自行注册，可设置：
+
+```env
+KITE_ALLOW_PUBLIC_REGISTRATION="true"
+```
+
 ## 生产部署
 
 裸 Node 部署：

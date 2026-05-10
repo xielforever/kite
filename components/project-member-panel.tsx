@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { addProjectMemberAction, removeProjectMemberAction, updateProjectMemberRoleFormAction } from "@/lib/actions";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { addProjectMemberAction, removeProjectMemberFormAction, updateProjectMemberRoleFormAction } from "@/lib/actions";
 import { projectRoleLabels, projectRoles, type ProjectRoleValue } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Candidate = { id: string; name: string; email: string };
+type ActionState = { ok?: boolean; error?: string };
 
 function MemberEmailSearch({
   workspaceSlug,
@@ -111,6 +112,107 @@ function MemberEmailSearch({
   );
 }
 
+function ProjectMemberRoleSelect({
+  workspaceSlug,
+  projectKey,
+  member,
+}: {
+  workspaceSlug: string;
+  projectKey: string;
+  member: { id: string; role: ProjectRoleValue; user: { name: string } };
+}) {
+  const router = useRouter();
+  const committedValue = useRef<ProjectRoleValue>(member.role);
+  const [value, setValue] = useState<ProjectRoleValue>(member.role);
+  const [message, setMessage] = useState<string | null>(null);
+  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
+    updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id),
+    {},
+  );
+
+  useEffect(() => {
+    setValue(member.role);
+    committedValue.current = member.role;
+  }, [member.role]);
+
+  useEffect(() => {
+    if (state.ok) {
+      committedValue.current = value;
+      setMessage("已保存");
+      router.refresh();
+      const timer = window.setTimeout(() => setMessage(null), 1600);
+      return () => window.clearTimeout(timer);
+    }
+    if (state.error) {
+      setValue(committedValue.current);
+      setMessage(state.error);
+    }
+  }, [router, state.error, state.ok, value]);
+
+  return (
+    <form action={formAction} className="space-y-1">
+      <select
+        name="role"
+        value={value}
+        disabled={isPending}
+        className="h-9 rounded-md border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label={`修改 ${member.user.name} 的项目角色`}
+        onChange={(event) => {
+          setValue(event.currentTarget.value as ProjectRoleValue);
+          setMessage("保存中...");
+          event.currentTarget.form?.requestSubmit();
+        }}
+      >
+        {projectRoles.map((role) => (
+          <option key={role} value={role}>
+            {projectRoleLabels[role]}
+          </option>
+        ))}
+      </select>
+      {message ? (
+        <p className={state.error ? "max-w-48 text-xs text-destructive" : "text-xs text-muted-foreground"} aria-live="polite">
+          {isPending ? "保存中..." : message}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+function ProjectMemberRemoveButton({
+  workspaceSlug,
+  projectKey,
+  member,
+}: {
+  workspaceSlug: string;
+  projectKey: string;
+  member: { id: string; user: { name: string } };
+}) {
+  const router = useRouter();
+  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
+    removeProjectMemberFormAction.bind(null, workspaceSlug, projectKey, member.id),
+    {},
+  );
+
+  useEffect(() => {
+    if (state.ok) router.refresh();
+  }, [router, state.ok]);
+
+  return (
+    <form
+      action={formAction}
+      className="mt-3 space-y-1"
+      onSubmit={(event) => {
+        if (!window.confirm("确定移除该项目成员？")) event.preventDefault();
+      }}
+    >
+      <Button size="sm" variant="ghost" disabled={isPending}>
+        {isPending ? "移除中..." : "移除"}
+      </Button>
+      {state.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+    </form>
+  );
+}
+
 export function ProjectMemberPanel({
   workspaceSlug,
   projectKey,
@@ -144,35 +246,12 @@ export function ProjectMemberPanel({
                   <p className="text-xs text-muted-foreground">{member.user.email}</p>
                 </div>
                 {canManage ? (
-                  <form
-                    action={updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id)}
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <select name="role" defaultValue={member.role} className="h-9 rounded-md border bg-background px-2 text-sm" aria-label={`修改 ${member.user.name} 的项目角色`}>
-                      {projectRoles.map((role) => (
-                        <option key={role} value={role}>
-                          {projectRoleLabels[role]}
-                        </option>
-                      ))}
-                    </select>
-                    <Button size="sm" variant="outline">
-                      保存
-                    </Button>
-                  </form>
+                  <ProjectMemberRoleSelect workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} />
                 ) : (
                   <Badge>{projectRoleLabels[member.role]}</Badge>
                 )}
               </div>
-              {canManage ? (
-                <form
-                  action={removeProjectMemberAction.bind(null, workspaceSlug, projectKey, member.id)}
-                  className="mt-3"
-                >
-                  <ConfirmSubmitButton size="sm" variant="ghost" message="确定移除该项目成员？">
-                    移除
-                  </ConfirmSubmitButton>
-                </form>
-              ) : null}
+              {canManage ? <ProjectMemberRemoveButton workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} /> : null}
             </div>
           ))}
         </div>

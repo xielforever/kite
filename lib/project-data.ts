@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/permissions";
-import { userPublicFields, type IssuePriorityValue, type IssueStatusValue } from "@/lib/constants";
+import { userPublicFields } from "@/lib/constants";
+import { sanitizeIssueFilters } from "@/lib/validators";
 
 export const PAGE_SIZE = 20;
 
@@ -9,23 +10,24 @@ export type IssueFilterInput = {
   status?: string;
   priority?: string;
   assignee?: string;
-  page?: number;
+  page?: number | string;
 };
 
 export async function getProjectPageData(workspaceSlug: string, projectKey: string, filters: IssueFilterInput = {}) {
   const context = await requireProject(workspaceSlug, projectKey);
-  const page = Math.max(1, filters.page ?? 1);
+  const normalizedFilters = sanitizeIssueFilters(filters);
+  const page = normalizedFilters.page;
   const issueWhere = {
     projectId: context.project.id,
-    ...(filters.status ? { status: filters.status as IssueStatusValue } : {}),
-    ...(filters.priority ? { priority: filters.priority as IssuePriorityValue } : {}),
-    ...(filters.assignee === "unassigned" ? { assigneeId: null } : {}),
-    ...(filters.assignee && filters.assignee !== "unassigned" ? { assigneeId: filters.assignee } : {}),
-    ...(filters.q
+    ...(normalizedFilters.status ? { status: normalizedFilters.status } : {}),
+    ...(normalizedFilters.priority ? { priority: normalizedFilters.priority } : {}),
+    ...(normalizedFilters.assignee === "unassigned" ? { assigneeId: null } : {}),
+    ...(normalizedFilters.assignee && normalizedFilters.assignee !== "unassigned" ? { assigneeId: normalizedFilters.assignee } : {}),
+    ...(normalizedFilters.q
       ? {
           OR: [
-            { title: { contains: filters.q, mode: "insensitive" as const } },
-            { description: { contains: filters.q, mode: "insensitive" as const } },
+            { title: { contains: normalizedFilters.q, mode: "insensitive" as const } },
+            { description: { contains: normalizedFilters.q, mode: "insensitive" as const } },
           ],
         }
       : {}),
