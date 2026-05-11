@@ -12,6 +12,8 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       KITE_ENV_FILE: /app/config/kite.env
+      AUTH_TRUST_HOST: "true"
+      KITE_DYNAMIC_AUTH_URL: "true"
     ports:
       - "${KITE_PORT:-3000}:3000"
     volumes:

@@ -71,7 +71,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
         ? "项目负责人视图"
         : "项目权限视图"
       : "项目成员视图";
-  const missingDefaultDueProjectCount = projects.filter((project) => !project.defaultDueDays).length;
+  const missingDefaultDueProjectCount = projects.filter((project) => (project._count.issues ?? 0) > 0 && !project.defaultDueDays).length;
   const reviewProjectCount = projects.filter((project) => (issueCounts[`${project.id}:REVIEW`] ?? 0) > 0).length;
 
   return (
@@ -107,7 +107,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
             <p className="mt-1 text-2xl font-semibold">{managedProjectCount}</p>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs text-muted-foreground">默认截止未设置</p>
+            <p className="text-xs text-muted-foreground">有任务未设默认截止</p>
             <p className={missingDefaultDueProjectCount ? "mt-1 text-2xl font-semibold text-amber-600 dark:text-amber-400" : "mt-1 text-2xl font-semibold"}>{missingDefaultDueProjectCount}</p>
           </div>
           <div className="bg-card p-4">

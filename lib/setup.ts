@@ -104,7 +104,7 @@ function parseDatabaseUrl(databaseUrl?: string | null) {
 export function getSetupDefaults() {
   return {
     ...parseDatabaseUrl(process.env.DATABASE_URL),
-    appUrl: process.env.AUTH_URL || "",
+    appUrl: process.env.KITE_PUBLIC_URL || process.env.AUTH_URL || "",
   };
 }
 
@@ -169,12 +169,14 @@ async function writeSetupEnv(databaseUrl: string, appUrl: string) {
   let content = await readEnvFile(envPath);
   content = upsertEnvValue(content, "DATABASE_URL", databaseUrl);
   content = upsertEnvValue(content, "AUTH_SECRET", authSecret);
-  content = upsertEnvValue(content, "AUTH_URL", appUrl);
+  content = upsertEnvValue(content, "AUTH_TRUST_HOST", "true");
+  content = upsertEnvValue(content, "KITE_PUBLIC_URL", appUrl);
   content = upsertEnvValue(content, "KITE_SETUP_COMPLETE", "true");
   await writeFile(envPath, content, "utf8");
   process.env.DATABASE_URL = databaseUrl;
   process.env.AUTH_SECRET = authSecret;
-  process.env.AUTH_URL = appUrl;
+  process.env.AUTH_TRUST_HOST = "true";
+  process.env.KITE_PUBLIC_URL = appUrl;
   process.env.KITE_SETUP_COMPLETE = "true";
   return envPath;
 }

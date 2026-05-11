@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validators";
 
 export const edgeAuthConfig = {
+  trustHost: true,
   session: {
     strategy: "jwt",
     maxAge: 4 * 60 * 60,

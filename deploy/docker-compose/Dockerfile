@@ -33,6 +33,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV KITE_ENV_FILE=/app/config/kite.env
+ENV AUTH_TRUST_HOST=true
+ENV KITE_DYNAMIC_AUTH_URL=true
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \

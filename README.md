@@ -52,7 +52,7 @@ http://localhost:3000/setup
 
 1. 验证数据源：填写 PG 地址、端口、用户名、密码、数据库名，并验证连接和建表权限。
 2. 执行迁移：执行 `prisma migrate deploy`。
-3. 创建管理员：创建第一个 `SUPER_ADMIN`、默认工作区和默认项目，并写入 `AUTH_URL`。
+3. 创建管理员：创建第一个 `SUPER_ADMIN`、默认工作区和默认项目，并写入 `KITE_PUBLIC_URL`。
 
 初始化成功后，当前页面会锁定，防止重复提交。服务重启后，已初始化环境访问 `/setup` 会重定向到登录页。
 
@@ -108,16 +108,16 @@ npm run start
 ```env
 DATABASE_URL="postgresql://kite_user:your_password@localhost:5432/kite?schema=public"
 AUTH_SECRET="replace-with-a-long-random-secret"
-AUTH_URL="https://tasks.example.com"
 ```
 
-远程访问时不要把 `AUTH_URL` 设置为 `http://localhost:3000`。如果通过服务器 IP 访问，可以设置为：
+首次初始化后，`/setup` 会写入 `KITE_PUBLIC_URL` 和 `KITE_SETUP_COMPLETE`。Docker Compose 和 systemd 部署默认都会信任当前请求 Host，所以公网域名、反向代理和端口映射都不会再被固定跳回节点 IP 或 `localhost`。
+
+如果你确实想把认证跳转固定到某个地址，再手工维护：
 
 ```env
-AUTH_URL="http://<server-ip>:3000"
+KITE_PUBLIC_URL="https://tasks.example.com"
+AUTH_TRUST_HOST="true"
 ```
-
-否则认证流程可能把浏览器重定向回访问者本机的 `localhost:3000`。
 
 手工维护时可用以下命令生成 `AUTH_SECRET`：
 
@@ -186,7 +186,7 @@ http://<server>:3000/setup
 docker compose restart app
 ```
 
-详细步骤见 [deploy/docker-compose/README.md](deploy/docker-compose/README.md)。
+Docker Compose 的完整公网部署说明见 [deploy/docker-compose/README.md](deploy/docker-compose/README.md)。
 
 ## 权限模型
 

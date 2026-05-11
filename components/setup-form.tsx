@@ -223,10 +223,12 @@ export function SetupForm({
               type="url"
               value={admin.appUrl}
               onChange={(event) => setAdmin({ ...admin, appUrl: event.target.value })}
-              placeholder="例如：http://192.168.1.10:3000"
+              placeholder="例如：https://kite.example.com"
               required
             />
-            <p className="text-xs text-muted-foreground">会写入 AUTH_URL，远程访问时不要使用访问者本机的 localhost。</p>
+            <p className="text-xs text-muted-foreground">
+              用于记录部署入口。登录和跳转默认信任当前请求域名，支持公网域名、反向代理和端口映射。
+            </p>
           </div>
 
           <div className="space-y-2">

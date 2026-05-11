@@ -30,4 +30,19 @@ if [ -s "$ENV_FILE" ]; then
   done < "$ENV_FILE"
 fi
 
+export AUTH_TRUST_HOST="${AUTH_TRUST_HOST:-true}"
+
+# Docker deployments are commonly accessed through a public domain, reverse proxy,
+# or a different port mapping than the address used during setup. A fixed AUTH_URL
+# makes Auth.js canonicalize redirects to that old address. By default, trust the
+# request Host instead; set KITE_DYNAMIC_AUTH_URL=false to opt back into AUTH_URL.
+case "${KITE_DYNAMIC_AUTH_URL:-true}" in
+  false | FALSE | 0 | no | NO)
+    ;;
+  *)
+    unset AUTH_URL
+    unset NEXTAUTH_URL
+    ;;
+esac
+
 exec "$@"
