@@ -7,6 +7,8 @@
 - `docker-compose.yml`：只编排 Kite 应用容器。
 - `Dockerfile`：构建 Kite 生产镜像。
 - `entrypoint.sh`：容器启动时创建并加载 `/setup` 写入的运行时配置。
+- `update.sh`：稳定更新脚本，保留运行配置，构建镜像，执行迁移并健康检查。
+- `rollback-config.sh`：只回滚 `data/kite.env` 配置备份，不回滚数据库。
 - `.env.example`：Compose 基础变量示例，只控制项目名、镜像名和 Kite 端口。
 
 ## 1. 准备 PostgreSQL
@@ -46,6 +48,8 @@ mkdir -p data
 COMPOSE_PROJECT_NAME=kite
 KITE_PORT=3000
 KITE_IMAGE=kite:local
+KITE_SKIP_GIT_PULL=false
+KITE_SKIP_MIGRATE=false
 ```
 
 不要提前创建或填写 `data/kite.env`。容器首次启动时会创建空文件；`DATABASE_URL`、`AUTH_SECRET`、`KITE_PUBLIC_URL` 和 `KITE_SETUP_COMPLETE` 只由 `/setup` 页面在初始化完成后写入。
@@ -134,6 +138,51 @@ docker compose build --no-cache app
 docker compose exec app npm run prisma:deploy
 docker compose exec app npm run check:migrations
 ```
+
+## 稳定更新
+
+已完成初始化的服务器后续更新不要删除 `data/kite.env`，不要清空 PostgreSQL。推荐使用更新脚本：
+
+```bash
+cd deploy/docker-compose
+sh update.sh
+```
+
+脚本会按顺序执行：
+
+1. 备份 `data/kite.env` 到 `data/backups/`。
+2. 执行 `git pull --ff-only`。
+3. 构建新应用镜像。
+4. 使用新镜像的一次性容器执行 `prisma migrate deploy`。
+5. 迁移成功后切换应用容器。
+6. 检查 `/login` 健康状态。
+
+如果代码已经由其他发布系统拉取，可跳过 `git pull`：
+
+```bash
+KITE_SKIP_GIT_PULL=true sh update.sh
+```
+
+如果只是重建镜像且确认没有数据库迁移，可临时跳过迁移：
+
+```bash
+KITE_SKIP_MIGRATE=true sh update.sh
+```
+
+更新失败时先看日志：
+
+```bash
+docker compose logs -f app
+```
+
+如果只是配置写坏了，可以恢复最近的配置备份：
+
+```bash
+ls -1 data/backups
+sh rollback-config.sh data/backups/kite.env.<timestamp>.bak
+```
+
+注意：`rollback-config.sh` 只恢复运行配置，不回滚代码镜像，也不回滚数据库迁移。
 
 ## 数据和备份
 
