@@ -74,30 +74,34 @@ export function ProjectMemberDialog({
   projectKey,
   members,
   canManage,
+  currentUserId,
 }: {
   workspaceSlug: string;
   projectKey: string;
   members: ProjectMember[];
   canManage: boolean;
+  currentUserId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const triggerLabel = canManage ? "成员管理" : "项目成员";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button onClick={() => setOpen(true)} size="sm" variant="outline">
         <Users className="mr-1 h-4 w-4" />
-        成员管理
+        {triggerLabel}
       </Button>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>项目成员</DialogTitle>
-          <DialogDescription>管理项目的成员和权限</DialogDescription>
+          <DialogDescription>{canManage ? "管理项目的成员和权限" : "查看当前项目成员和角色"}</DialogDescription>
         </DialogHeader>
         <ProjectMemberPanel
           workspaceSlug={workspaceSlug}
           projectKey={projectKey}
           members={members}
           canManage={canManage}
+          currentUserId={currentUserId}
         />
       </DialogContent>
     </Dialog>

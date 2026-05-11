@@ -53,6 +53,11 @@ export function IssueBoard({
 }) {
   const [localIssues, setLocalIssues] = useState(issues);
   const [toast, setToast] = useState<{ type: "ok" | "err"; message: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     setLocalIssues(issues);
   }, [issues]);
@@ -116,8 +121,52 @@ export function IssueBoard({
     }
   }
 
+  const stats = (
+    <div className="mb-4 grid gap-px overflow-hidden rounded-lg border bg-border text-sm sm:grid-cols-4">
+      <div className="bg-card p-3">
+        <p className="text-xs text-muted-foreground">当前任务</p>
+        <p className="mt-1 text-lg font-semibold">{boardStats.total}</p>
+      </div>
+      <div className="bg-card p-3">
+        <p className="text-xs text-muted-foreground">流转中</p>
+        <p className="mt-1 text-lg font-semibold">{boardStats.active}</p>
+      </div>
+      <div className="bg-card p-3">
+        <p className="text-xs text-muted-foreground">已逾期</p>
+        <p className={boardStats.overdue ? "mt-1 text-lg font-semibold text-destructive" : "mt-1 text-lg font-semibold"}>{boardStats.overdue}</p>
+      </div>
+      <div className="bg-card p-3">
+        <p className="text-xs text-muted-foreground">未分配</p>
+        <p className={boardStats.unassigned ? "mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400" : "mt-1 text-lg font-semibold"}>{boardStats.unassigned}</p>
+      </div>
+    </div>
+  );
+
+  const staticColumns = (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {statusColumns.map((status) => (
+        <StaticBoardColumn
+          key={status}
+          status={status}
+          issues={grouped[status]}
+          workspaceSlug={workspaceSlug}
+          projectKey={projectKey}
+        />
+      ))}
+    </div>
+  );
+
+  if (!mounted) {
+    return (
+      <>
+        {stats}
+        {staticColumns}
+      </>
+    );
+  }
+
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext id={`issue-board-${workspaceSlug}-${projectKey}`} sensors={sensors} onDragEnd={onDragEnd}>
       <div className="relative">
         {toast ? (
           <div className={`fixed bottom-4 right-4 z-50 rounded-md px-4 py-2 text-sm font-medium shadow-lg transition-opacity ${toast.type === "ok" ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
@@ -125,24 +174,7 @@ export function IssueBoard({
           </div>
         ) : null}
       </div>
-      <div className="mb-4 grid gap-px overflow-hidden rounded-lg border bg-border text-sm sm:grid-cols-4">
-        <div className="bg-card p-3">
-          <p className="text-xs text-muted-foreground">当前任务</p>
-          <p className="mt-1 text-lg font-semibold">{boardStats.total}</p>
-        </div>
-        <div className="bg-card p-3">
-          <p className="text-xs text-muted-foreground">流转中</p>
-          <p className="mt-1 text-lg font-semibold">{boardStats.active}</p>
-        </div>
-        <div className="bg-card p-3">
-          <p className="text-xs text-muted-foreground">已逾期</p>
-          <p className={boardStats.overdue ? "mt-1 text-lg font-semibold text-destructive" : "mt-1 text-lg font-semibold"}>{boardStats.overdue}</p>
-        </div>
-        <div className="bg-card p-3">
-          <p className="text-xs text-muted-foreground">未分配</p>
-          <p className={boardStats.unassigned ? "mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400" : "mt-1 text-lg font-semibold"}>{boardStats.unassigned}</p>
-        </div>
-      </div>
+      {stats}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {statusColumns.map((status) => (
           <BoardColumn
@@ -156,6 +188,44 @@ export function IssueBoard({
         ))}
       </div>
     </DndContext>
+  );
+}
+
+function StaticBoardColumn({
+  status,
+  issues,
+  workspaceSlug,
+  projectKey,
+}: {
+  status: IssueStatusValue;
+  issues: BoardIssue[];
+  workspaceSlug: string;
+  projectKey: string;
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/40 p-3">
+      <div className="mb-3 space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">{statusLabels[status]}</h2>
+          <span className="rounded-md border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{issues.length}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{columnHints[status]}</p>
+      </div>
+      <div className="min-h-40 space-y-3">
+        {issues.map((issue) => (
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            href={`/w/${workspaceSlug}/projects/${projectKey}/issues/${issue.id}`}
+          />
+        ))}
+        {!issues.length ? (
+          <div className="rounded-md border border-dashed bg-background/70 p-4 text-center text-sm text-muted-foreground">
+            暂无任务
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

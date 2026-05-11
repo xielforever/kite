@@ -64,11 +64,18 @@ export default async function ProjectsPage({ params }: { params: Promise<{ works
     const projectMembership = project.members.find((member) => member.userId === user.id);
     return isSystemAdmin || canManageProject(projectMembership?.role);
   }).length;
+  const viewLabel = isSystemAdmin
+    ? "系统管理视图"
+    : managedProjectCount > 0
+      ? managedProjectCount === projects.length
+        ? "项目负责人视图"
+        : "项目权限视图"
+      : "项目成员视图";
   const missingDefaultDueProjectCount = projects.filter((project) => !project.defaultDueDays).length;
   const reviewProjectCount = projects.filter((project) => (issueCounts[`${project.id}:REVIEW`] ?? 0) > 0).length;
 
   return (
-    <AppShell title="项目" subtitle={`${workspace.name} · ${isSystemAdmin ? "系统管理视图" : "项目成员视图"}`} workspaceSlug={workspaceSlug}>
+    <AppShell title="项目" subtitle={`${workspace.name} · ${viewLabel}`} workspaceSlug={workspaceSlug}>
       <section className="mb-6 rounded-lg border bg-card">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { priorityLabels, statusLabels } from "@/lib/constants";
+import { NextRequest, NextResponse } from "next/server";
+import { issueStatuses, priorityLabels, statusLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { requireSystemAdmin } from "@/lib/permissions";
 
@@ -16,10 +16,23 @@ function formatDateTime(value?: Date | null) {
   return value ? value.toISOString() : "";
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   await requireSystemAdmin();
+  const workspaceSlug = request.nextUrl.searchParams.get("workspace")?.trim() || undefined;
+  const projectKey = request.nextUrl.searchParams.get("project")?.trim() || undefined;
+  const status = request.nextUrl.searchParams.get("status")?.trim() || undefined;
+  const statusFilter = issueStatuses.includes(status as (typeof issueStatuses)[number])
+    ? (status as (typeof issueStatuses)[number])
+    : undefined;
 
   const issues = await prisma.issue.findMany({
+    where: {
+      ...(statusFilter ? { status: statusFilter } : {}),
+      project: {
+        ...(projectKey ? { key: projectKey } : {}),
+        ...(workspaceSlug ? { workspace: { slug: workspaceSlug } } : {}),
+      },
+    },
     include: {
       project: { include: { workspace: true } },
       creator: { select: { name: true, email: true } },

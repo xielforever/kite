@@ -44,7 +44,7 @@ export default async function ProjectBoardPage({
             {canEditProject ? (
               <CreateIssueDialog workspaceSlug={workspaceSlug} projectKey={projectKey} members={memberOptions} currentUserId={user.id} />
             ) : null}
-            <ProjectMemberDialog workspaceSlug={workspaceSlug} projectKey={projectKey} members={members} canManage={canManageProject} />
+            <ProjectMemberDialog workspaceSlug={workspaceSlug} projectKey={projectKey} members={members} canManage={canManageProject} currentUserId={user.id} />
           </div>
         </div>
       </div>

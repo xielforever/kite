@@ -1,15 +1,15 @@
-import Link from "next/link";
 import { requireSystemAdmin } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, Download, FolderKanban, KeyRound, Search, ShieldCheck, Users } from "lucide-react";
+import { Building2, FolderKanban, KeyRound, Search, ShieldCheck, Users } from "lucide-react";
 import { projectRoleLabels, type ProjectRoleValue } from "@/lib/constants";
 import { adminResetPasswordAction } from "@/lib/actions";
 import { ActionForm } from "@/components/action-form";
 import { AdminCreateUserDialog } from "@/components/admin-create-user-dialog";
+import { AdminExportIssuesDialog } from "@/components/admin-export-issues-dialog";
 import { AdminRoleSelect } from "@/components/admin-role-select";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
@@ -77,6 +77,19 @@ function ProjectPermissionBadges({
   }
 
   if (!memberships.length) return <span className="text-muted-foreground">无</span>;
+
+  if (memberships.length > 2) {
+    return (
+      <details className="group">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary">
+          {memberships.length} 项项目权限
+        </summary>
+        <div className="mt-2 max-h-28 overflow-y-auto pr-1">
+          <div className="flex flex-wrap gap-1.5">{badges}</div>
+        </div>
+      </details>
+    );
+  }
 
   return (
     <div className="max-h-24 overflow-y-auto pr-1">
@@ -155,6 +168,19 @@ export default async function AdminPage({
       },
     },
   });
+  const exportWorkspaces = await prisma.workspace.findMany({
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      projects: {
+        where: { archived: false },
+        select: { id: true, key: true, name: true },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
     <AppShell title="系统管理" subtitle="系统管理员专属后台">
@@ -204,6 +230,9 @@ export default async function AdminPage({
                   待改密 {pendingPasswordCount}
                 </Badge>
               </div>
+              <p className="mt-3 max-w-2xl text-xs text-muted-foreground">
+                系统管理员拥有全局访问和管理权限；项目权限列中的显式项目身份仅用于记录其在具体项目中的业务角色。
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <form action="/admin" method="get" className="flex min-w-0 items-center gap-2">
@@ -222,12 +251,7 @@ export default async function AdminPage({
                 </Button>
               </form>
               <AdminCreateUserDialog />
-              <Button asChild variant="outline" size="sm" className="shrink-0 bg-background">
-                <Link href="/api/admin/exports/issues">
-                  <Download className="h-4 w-4" />
-                  导出项目任务
-                </Link>
-              </Button>
+              <AdminExportIssuesDialog workspaces={exportWorkspaces} />
             </div>
           </div>
         </CardHeader>

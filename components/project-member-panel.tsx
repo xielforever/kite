@@ -116,10 +116,14 @@ function ProjectMemberRoleSelect({
   workspaceSlug,
   projectKey,
   member,
+  currentUserId,
+  leadCount,
 }: {
   workspaceSlug: string;
   projectKey: string;
-  member: { id: string; role: ProjectRoleValue; user: { name: string } };
+  member: { id: string; role: ProjectRoleValue; user: { id: string; name: string } };
+  currentUserId: string;
+  leadCount: number;
 }) {
   const router = useRouter();
   const committedValue = useRef<ProjectRoleValue>(member.role);
@@ -129,6 +133,7 @@ function ProjectMemberRoleSelect({
     updateProjectMemberRoleFormAction.bind(null, workspaceSlug, projectKey, member.id),
     {},
   );
+  const isLastLead = member.role === "LEAD" && leadCount <= 1;
 
   useEffect(() => {
     setValue(member.role);
@@ -154,11 +159,20 @@ function ProjectMemberRoleSelect({
       <select
         name="role"
         value={value}
-        disabled={isPending}
+        disabled={isPending || isLastLead}
         className="h-9 rounded-md border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
         aria-label={`修改 ${member.user.name} 的项目角色`}
         onChange={(event) => {
-          setValue(event.currentTarget.value as ProjectRoleValue);
+          const nextValue = event.currentTarget.value as ProjectRoleValue;
+          if (member.user.id === currentUserId && member.role === "LEAD" && nextValue !== "LEAD") {
+            const confirmed = window.confirm("将自己降级后，你可能立即失去本项目的成员管理权限。确定继续？");
+            if (!confirmed) {
+              event.currentTarget.value = committedValue.current;
+              setValue(committedValue.current);
+              return;
+            }
+          }
+          setValue(nextValue);
           setMessage("保存中...");
           event.currentTarget.form?.requestSubmit();
         }}
@@ -174,6 +188,7 @@ function ProjectMemberRoleSelect({
           {isPending ? "保存中..." : message}
         </p>
       ) : null}
+      {isLastLead ? <p className="max-w-48 text-xs text-muted-foreground">最后一位项目负责人不可降级</p> : null}
     </form>
   );
 }
@@ -182,10 +197,14 @@ function ProjectMemberRemoveButton({
   workspaceSlug,
   projectKey,
   member,
+  currentUserId,
+  leadCount,
 }: {
   workspaceSlug: string;
   projectKey: string;
-  member: { id: string; user: { name: string } };
+  member: { id: string; role: ProjectRoleValue; user: { id: string; name: string } };
+  currentUserId: string;
+  leadCount: number;
 }) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
@@ -197,17 +216,23 @@ function ProjectMemberRemoveButton({
     if (state.ok) router.refresh();
   }, [router, state.ok]);
 
+  const isLastLead = member.role === "LEAD" && leadCount <= 1;
+  const confirmMessage = member.user.id === currentUserId
+    ? "移除自己后，你可能立即失去本项目访问或管理权限。确定继续？"
+    : "确定移除该项目成员？";
+
   return (
     <form
       action={formAction}
       className="mt-3 space-y-1"
       onSubmit={(event) => {
-        if (!window.confirm("确定移除该项目成员？")) event.preventDefault();
+        if (isLastLead || !window.confirm(confirmMessage)) event.preventDefault();
       }}
     >
-      <Button size="sm" variant="ghost" disabled={isPending}>
+      <Button size="sm" variant="ghost" disabled={isPending || isLastLead}>
         {isPending ? "移除中..." : "移除"}
       </Button>
+      {isLastLead ? <p className="text-xs text-muted-foreground">最后一位项目负责人不可移除</p> : null}
       {state.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
     </form>
   );
@@ -218,14 +243,17 @@ export function ProjectMemberPanel({
   projectKey,
   members,
   canManage,
+  currentUserId,
 }: {
   workspaceSlug: string;
   projectKey: string;
   members: { id: string; role: ProjectRoleValue; user: { id: string; name: string; email: string } }[];
   canManage: boolean;
+  currentUserId: string;
 }) {
   const addProjectMember = addProjectMemberAction.bind(null, workspaceSlug, projectKey);
   const [email, setEmail] = useState("");
+  const leadCount = members.filter((member) => member.role === "LEAD").length;
 
   return (
     <div className="space-y-5">
@@ -246,12 +274,12 @@ export function ProjectMemberPanel({
                   <p className="text-xs text-muted-foreground">{member.user.email}</p>
                 </div>
                 {canManage ? (
-                  <ProjectMemberRoleSelect workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} />
+                  <ProjectMemberRoleSelect workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} currentUserId={currentUserId} leadCount={leadCount} />
                 ) : (
                   <Badge>{projectRoleLabels[member.role]}</Badge>
                 )}
               </div>
-              {canManage ? <ProjectMemberRemoveButton workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} /> : null}
+              {canManage ? <ProjectMemberRemoveButton workspaceSlug={workspaceSlug} projectKey={projectKey} member={member} currentUserId={currentUserId} leadCount={leadCount} /> : null}
             </div>
           ))}
         </div>
